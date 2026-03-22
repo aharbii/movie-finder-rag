@@ -1,18 +1,40 @@
 # Python
-.venv
-__pycache__
-.mypy_cache
-.pytest_cache
-.ruff_cache
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Type checking & linting caches
+.mypy_cache/
+.ruff_cache/
+
+# Test & coverage
+.pytest_cache/
 .coverage
+coverage.xml
+test-results.xml
+htmlcov/
 
 # IDEs
-.vscode
+.vscode/
+.idea/
 
-# Secrets
+# Secrets — never commit
 .env
 
-# Caches
+# Logs
+logs/
 *.log
+
+# Dataset (large files — download via kagglehub, never commit)
+/dataset/
 *.csv
-chroma
+
+# Local vector stores
+chroma/
+
+# OS
+.DS_Store
+Thumbs.db

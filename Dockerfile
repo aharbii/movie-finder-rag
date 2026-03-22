@@ -38,7 +38,7 @@ COPY --from=builder /build/.venv /app/.venv
 COPY src/ src/
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONPATH="/app" \
+    PYTHONPATH="/app/src" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
