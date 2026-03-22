@@ -1,0 +1,11 @@
+# Python
+.venv
+__pycache__
+.mypy_cache
+
+# Secrets
+.env
+
+# Caches
+*.log
+dataset
