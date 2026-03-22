@@ -16,8 +16,14 @@ dependencies = [
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.7",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 88
