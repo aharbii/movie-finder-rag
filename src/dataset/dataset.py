@@ -30,9 +30,7 @@ def download_data(update: bool = True) -> None:
 
     HOME_DIR = Path.home()
     KAGGLE_CACHE_DIR = os.path.join(HOME_DIR, ".cache", "kagglehub", "datasets")
-    DATASET_PATH = os.path.join(
-        KAGGLE_CACHE_DIR, DATASET_HANDLE, "versions", "1", DATASET_NAME
-    )
+    DATASET_PATH = os.path.join(KAGGLE_CACHE_DIR, DATASET_HANDLE, "versions", "1", DATASET_NAME)
 
     try:
         kagglehub.dataset_load(
@@ -42,9 +40,7 @@ def download_data(update: bool = True) -> None:
         )
         logger.info(f"Wiki-Movie Plots dataset downloaded to {DATASET_PATH}")
     except Exception as error:
-        logger.error(
-            f"Failed to download Wiki-Movie Plots dataset, error message {error}"
-        )
+        logger.error(f"Failed to download Wiki-Movie Plots dataset, error message {error}")
         sys.exit(1)
 
     shutil.move(DATASET_PATH, os.path.join(TARGET_DATASET_DIR, DATASET_NAME))

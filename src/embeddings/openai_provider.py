@@ -35,9 +35,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         max_input=8192,
     )
 
-    def __init__(
-        self, model: EmbeddingModel = EMBEDDING_ADA_002_MODEL, debug: bool = False
-    ):
+    def __init__(self, model: EmbeddingModel = EMBEDDING_ADA_002_MODEL, debug: bool = False):
         self.logger = get_logger(self.__class__.__name__, debug)
 
         self._validate_env()

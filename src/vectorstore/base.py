@@ -6,9 +6,7 @@ from models.movie import Movie
 
 class VectorStore(ABC):
     @abstractmethod
-    def upsert(
-        self, movie: Movie, vector: list[float], embedding_model: EmbeddingModel
-    ) -> None:
+    def upsert(self, movie: Movie, vector: list[float], embedding_model: EmbeddingModel) -> None:
         pass
 
     @abstractmethod

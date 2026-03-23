@@ -26,9 +26,7 @@ def get_logger(name: str, debug: bool = False) -> logging.Logger:
 
     if not logger.handlers:
         logger.setLevel(logging.DEBUG if debug else logging.INFO)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)

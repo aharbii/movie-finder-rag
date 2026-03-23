@@ -25,9 +25,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         max_input=2048,
     )
 
-    def __init__(
-        self, model: EmbeddingModel = GEMINI_EMBEDDING_001_MODEL, debug: bool = False
-    ):
+    def __init__(self, model: EmbeddingModel = GEMINI_EMBEDDING_001_MODEL, debug: bool = False):
         self.logger = get_logger(self.__class__.__name__, debug)
 
         self._validate_env()
@@ -60,9 +58,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
             for index in range(len(response.embeddings)):
                 embedding_values = response.embeddings[index].values
                 if embedding_values:
-                    self.logger.debug(
-                        f"Embedded size[{index}]: {len(embedding_values)}"
-                    )
+                    self.logger.debug(f"Embedded size[{index}]: {len(embedding_values)}")
                 statistics = response.embeddings[index].statistics
                 if statistics:
                     if statistics.truncated:
@@ -113,9 +109,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
             self.gcp_enabled = False
             return
         else:
-            credentials_file_path = os.path.join(
-                os.getcwd(), GOOGLE_APPLICATION_CREDENTIALS
-            )
+            credentials_file_path = os.path.join(os.getcwd(), GOOGLE_APPLICATION_CREDENTIALS)
 
             if not os.path.exists(credentials_file_path):
                 self.logger.warning(

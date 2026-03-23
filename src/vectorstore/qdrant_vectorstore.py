@@ -20,18 +20,14 @@ class QdrantVectorStore(VectorStore):
             url=os.getenv("QDRANT_ENDPOINT"), api_key=os.getenv("QDRANT_API_KEY")
         )
 
-    def upsert(
-        self, movie: Movie, vector: list[float], embedding_model: EmbeddingModel
-    ) -> None:
+    def upsert(self, movie: Movie, vector: list[float], embedding_model: EmbeddingModel) -> None:
         self._validate_collection(embedding_model)
         point = PointStruct(
             id=movie.id,
             vector=vector,
             payload=movie.model_dump(),
         )
-        self.client.upsert(
-            collection_name=embedding_model.name.replace("/", "-"), points=[point]
-        )
+        self.client.upsert(collection_name=embedding_model.name.replace("/", "-"), points=[point])
 
     def upsert_batch(
         self,
@@ -48,9 +44,7 @@ class QdrantVectorStore(VectorStore):
                 payload=movie.model_dump(),
             )
             points.append(point)
-        self.client.upsert(
-            collection_name=embedding_model.name.replace("/", "-"), points=points
-        )
+        self.client.upsert(collection_name=embedding_model.name.replace("/", "-"), points=points)
 
     def search(
         self,
@@ -85,9 +79,7 @@ class QdrantVectorStore(VectorStore):
 
     def _validate_collection(self, embedding_model: EmbeddingModel) -> None:
         if not self.client.collection_exists(embedding_model.name.replace("/", "-")):
-            self.logger.info(
-                f"Creating collection for {embedding_model.name.replace('/', '-')}"
-            )
+            self.logger.info(f"Creating collection for {embedding_model.name.replace('/', '-')}")
             self.client.create_collection(
                 collection_name=embedding_model.name.replace("/", "-"),
                 vectors_config=VectorParams(

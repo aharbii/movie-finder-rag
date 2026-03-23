@@ -8,9 +8,7 @@ from vectorstore.base import VectorStore
 logger = get_logger(__name__)
 
 
-def ingest_csv(
-    embedding_provider: EmbeddingProvider, vector_store: VectorStore
-) -> None:
+def ingest_csv(embedding_provider: EmbeddingProvider, vector_store: VectorStore) -> None:
     movies_descriptions = csv_loader.parse_wiki_movie()
     logger.info(f"Embedding {len(movies_descriptions)} movies to the vector store")
     movies = []

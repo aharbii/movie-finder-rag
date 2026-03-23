@@ -12,9 +12,7 @@ class ChromaDBVectorStore(VectorStore):
 
         self.client = chromadb.PersistentClient()
 
-    def upsert(
-        self, movie: Movie, vector: list[float], embedding_model: EmbeddingModel
-    ) -> None:
+    def upsert(self, movie: Movie, vector: list[float], embedding_model: EmbeddingModel) -> None:
         self._validate_collection(embedding_model)
 
         collection = self.client.get_collection(embedding_model.name.replace("/", "-"))
@@ -76,7 +74,5 @@ class ChromaDBVectorStore(VectorStore):
         try:
             self.client.get_collection(embedding_model.name.replace("/", "-"))
         except chromadb.errors.NotFoundError:
-            self.logger.info(
-                f"Creating collection for {embedding_model.name.replace('/', '-')}"
-            )
+            self.logger.info(f"Creating collection for {embedding_model.name.replace('/', '-')}")
             self.client.create_collection(name=embedding_model.name.replace("/", "-"))

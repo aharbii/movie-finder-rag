@@ -19,23 +19,7 @@ def parse_movie(movie_entry: pd.Series) -> Movie:
 
 def parse_wiki_movie() -> list[tuple[Movie, str]]:
     DATASET_DIR = os.path.join(os.getcwd(), "dataset", "data")
-    DATASET_PATH = os.path.join(
-        DATASET_DIR, "wiki_movie", "wiki_movie_plots_deduped.csv"
-    )
-
-    MOVIE_DESCRIPTION_TEMPLATE = """Title: {title}
-
-Release Year: {release_year}
-
-Director: {director}
-
-Genre: {genre}
-
-Cast: {cast}
-
-Plot:
-{plot}
-"""
+    DATASET_PATH = os.path.join(DATASET_DIR, "wiki_movie", "wiki_movie_plots_deduped.csv")
 
     df = pd.read_csv(DATASET_PATH)
 
@@ -48,13 +32,13 @@ Plot:
         movie = parse_movie(movie_entry)
         movie.id = id
 
-        description = MOVIE_DESCRIPTION_TEMPLATE.format(
-            title=movie.title,
-            release_year=movie.release_year,
-            director=movie.director,
-            genre=movie.genre,
-            cast=movie.cast,
-            plot=movie.plot,
+        description = (
+            f"Title: {movie.title}\n\n"
+            f"Release Year: {movie.release_year}\n\n"
+            f"Director: {movie.director}\n\n"
+            f"Genre: {movie.genre}\n\n"
+            f"Cast: {movie.cast}\n\n"
+            f"Plot:\n{movie.plot}\n"
         )
         movies_description.append((movie, description))
 
