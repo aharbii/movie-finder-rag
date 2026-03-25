@@ -1,0 +1,208 @@
+# Claude Code — rag_ingestion submodule
+
+This is **`movie-finder-rag`** (`backend/rag_ingestion/`) — part of the Movie Finder project.
+GitHub repo: `aharbii/movie-finder-rag` · Parent repo: `aharbii/movie-finder`
+
+---
+
+## What this submodule does
+
+Offline RAG ingestion pipeline. Downloads the movie dataset from Kaggle, generates embeddings,
+and upserts vectors into Qdrant Cloud. Runs as a one-shot script, not part of the live API.
+
+- **Data source:** Kaggle dataset via `kagglehub`
+- **Embedding model:** OpenAI `text-embedding-3-large` (3072-dim)
+- **Vector store:** Qdrant Cloud — always external, never a local container
+- **Intentionally outside** the `uv` workspace (separate lifecycle from `backend/`)
+- **Jenkins trigger:** Manual (`RUN_INGESTION=true` parameter) or on `main`/tags
+- **Output artifact:** `ingestion-outputs.env` — archived by Jenkins, used by `chain/` team to verify collection name and dimension
+
+---
+
+## Full project context
+
+### Submodule map
+
+| Path | GitHub repo | Role |
+|---|---|---|
+| `.` (root) | `aharbii/movie-finder` | Parent — all cross-repo issues |
+| `backend/` | `aharbii/movie-finder-backend` | FastAPI + uv workspace root |
+| `backend/app/` | (nested in backend) | FastAPI application layer |
+| `backend/chain/` | `aharbii/movie-finder-chain` | LangGraph 8-node AI pipeline |
+| `backend/imdbapi/` | `aharbii/imdbapi-client` | Async IMDb REST client |
+| `backend/rag_ingestion/` | `aharbii/movie-finder-rag` | **← you are here** |
+| `frontend/` | `aharbii/movie-finder-frontend` | Angular 21 SPA |
+| `docs/` | `aharbii/movie-finder-docs` | MkDocs documentation |
+| `infrastructure/` | `aharbii/movie-finder-infrastructure` | IaC / Azure provisioning |
+
+### Technology stack
+
+| Layer | Stack |
+|---|---|
+| Language | Python 3.13 (standalone `uv` project, not workspace member) |
+| Data | `kagglehub`, `pandas`, `pydantic` |
+| Embeddings | `openai` SDK — `text-embedding-3-large`, 3072-dim |
+| Vector store | `qdrant-client` (Qdrant Cloud only) |
+| Linting | `ruff` (line-length 100, rules: E/W/F/I/B/UP) |
+| Type checking | `mypy --strict` (Python 3.13) |
+| Tests | `pytest`, `pytest-cov` |
+| CI | Jenkins Multibranch → Azure Container Registry |
+
+### Environment variables (`.env.example`)
+
+```
+QDRANT_ENDPOINT, QDRANT_API_KEY, QDRANT_COLLECTION
+OPENAI_API_KEY
+EMBEDDING_MODEL=text-embedding-3-large
+EMBEDDING_DIMENSION=3072
+KAGGLE_USERNAME, KAGGLE_KEY
+VECTOR_STORE=qdrant            # or chromadb (experimental)
+```
+
+---
+
+## Design patterns to follow
+
+| Pattern | Where | Rule |
+|---|---|---|
+| **Strategy** | Embedding providers | New provider = new class implementing the embedding interface. Never add `if provider == "openai":` in the ingestion loop. |
+| **Strategy** | Vector store backends | `qdrant` and `chromadb` are strategies behind a common interface. Add new stores the same way. |
+| **Configuration object** | `config.py` / Pydantic `BaseSettings` | All env vars loaded once. Never call `os.getenv()` inside pipeline functions. |
+| **Factory** | Provider instantiation | Provider objects are created in one place (entrypoint / factory function), not scattered throughout pipeline steps. |
+
+---
+
+## Coding standards
+
+- `mypy --strict` must pass — no `type: ignore` without an explanatory comment
+- No bare `except:` — catch specific exceptions
+- Docstrings on all public classes and functions (Google style)
+- No `print()` in production code — use `logging`
+- Line length: 100 (`ruff`)
+- `ruff` rules: E, W, F, I, B, UP (ignore E501, B008)
+- Tests are not optional — every new provider or pipeline step needs coverage
+
+---
+
+## Pre-commit hooks
+
+`backend/rag_ingestion/.pre-commit-config.yaml` — install and run from this directory.
+
+```bash
+uv run pre-commit install    # once per clone
+uv run pre-commit run --all-files
+```
+
+| Hook | Notes |
+|---|---|
+| `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-case-conflict`, `check-merge-conflict` | File health |
+| `check-added-large-files`, `check-illegal-windows-names`, `detect-private-key` | Safety |
+| `pretty-format-json` | JSON files auto-formatted |
+| `sort-simple-yaml` | YAML keys sorted |
+| `detect-secrets` | No API keys or tokens |
+| `mypy` (strict, Python 3.13, extra dep: `pydantic`) | Type checking |
+| `ruff-check --fix`, `ruff-format` | Linting and formatting |
+
+**Never `--no-verify`.** False-positive → `# pragma: allowlist secret` + `detect-secrets scan > .secrets.baseline`.
+
+---
+
+## VSCode setup
+
+`backend/rag_ingestion/.vscode/` is committed with a full workspace configuration:
+- `settings.json` — Python interpreter (`rag_ingestion/.venv`, standalone project), Ruff, mypy strict, pytest
+- `extensions.json` — Python, debugpy, Ruff, mypy, TOML, GitLens
+- `launch.json` — ingestion pipeline runner + pytest all / current file
+- `tasks.json` — lint, format, test, test with coverage, pre-commit, ingestion dry run
+
+**Interpreter:** Run `uv sync` from `backend/rag_ingestion/` — creates its own `.venv/` (standalone)
+
+---
+
+## Session start protocol
+
+1. `gh issue list --repo aharbii/movie-finder --state open` — check existing issues
+2. Create issue in `aharbii/movie-finder`, then `aharbii/movie-finder-rag` linked to parent
+3. Create branch: `feature/`, `fix/`, `chore/`, or `docs/` (kebab-case)
+4. Work through the cross-cutting checklist below
+
+---
+
+## Branching and commits
+
+```
+feature/<kebab>  fix/<kebab>  chore/<kebab>  docs/<kebab>
+```
+
+Conventional Commits: `feat(rag): add Gemini embedding provider`
+
+---
+
+## Cross-cutting change checklist
+
+### 1. GitHub issues
+- [ ] `aharbii/movie-finder` (parent)
+- [ ] `aharbii/movie-finder-rag` linked (`Part of aharbii/movie-finder#N`)
+
+### 2. Branch
+- [ ] Branch in this repo
+- [ ] `chore/` branch in `backend/` and root `movie-finder` to bump pointers after merge
+
+### 3. ADR
+- [ ] New embedding provider, new vector store, or new external dependency?
+  → Write `docs/architecture/decisions/ADR-NNN-title.md` (template in `decisions/index.md`)
+
+### 4. Implementation and tests
+- [ ] New provider follows the Strategy pattern
+- [ ] `ruff` + `mypy --strict` pass
+- [ ] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
+- [ ] `pytest --cov` passes with no regression
+
+### 5. Environment and secrets
+- [ ] `.env.example` updated in: **this repo**, `backend/`, `backend/chain/` (if embedding model is shared), root `movie-finder`
+- [ ] New API keys flagged to user for manual addition to:
+  - Azure Key Vault
+  - Jenkins credentials store (`docs/devops-setup.md` credentials table)
+  - GitHub repository secrets (future)
+- [ ] Jenkins `Jenkinsfile` credentials list updated if new secrets needed at CI time
+
+### 6. Docker
+- [ ] `Dockerfile` updated (new deps, new build args, new env vars)
+- [ ] `docker-compose.yml` updated if service interface changed
+- [ ] Root `docker-compose.yml` updated if needed
+
+### 7. CI — Jenkins
+- [ ] `Jenkinsfile` reviewed — new stages, credentials, or parameters?
+- [ ] `ingestion-outputs.env` artifact format still valid (chain team depends on it)
+
+### 8. Architecture diagrams (in `docs/` submodule)
+- [ ] **PlantUML** — update `02-system-architecture.puml` or `03-backend-architecture.puml` if provider list changes
+  **Never generate `.mdj`** — user syncs to StarUML manually
+- [ ] **Structurizr C4** — update `workspace.dsl` if new external system added (e.g., Google AI)
+- [ ] Commit to `aharbii/movie-finder-docs` first, then bump `docs/` pointer in root
+
+### 9. Documentation
+- [ ] `docs/` pages updated (ingestion guide, embedding configuration)
+- [ ] `README.md` updated (new provider, new env vars, new usage)
+- [ ] `CHANGELOG.md` updated under `[Unreleased]`
+
+### 10. Sibling submodules likely affected
+| Submodule | Why |
+|---|---|
+| `backend/chain/` | Embedding model at query time must match ingestion — coordinate changes |
+| `backend/` | New env vars may need to pass through the backend workspace |
+| `infrastructure/` | New Azure AI service or new secret → infra and Key Vault update |
+| `docs/` | Architecture diagrams, ingestion runbook |
+
+### 11. Submodule pointer bump
+```bash
+# in backend/ repo
+git add rag_ingestion && git commit -m "chore(rag): bump to latest main"
+# in root movie-finder
+git add backend && git commit -m "chore(backend): bump to latest main"
+```
+
+### 12. Pull request
+- [ ] PR in `aharbii/movie-finder-rag`
+- [ ] PR in `aharbii/movie-finder-backend` (pointer bump)
+- [ ] PR in `aharbii/movie-finder` (pointer bump)
