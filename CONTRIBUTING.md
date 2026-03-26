@@ -2,7 +2,9 @@
 
 The rag_ingestion project is a **one-shot batch pipeline** that downloads the Wikipedia Movie Plots dataset from Kaggle, embeds it with an embedding provider, and loads it into a vector store (Qdrant or ChromaDB). It is the data backbone for the `chain` package.
 
-For org-wide conventions (branching, commits, PRs, release process) see the [backend CONTRIBUTING.md](../CONTRIBUTING.md).
+For org-wide conventions (branching, commits, PRs, release process, issue/PR template inspection,
+and AI disclosure in PR descriptions or AI-assisted reviews) see the
+[backend CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
