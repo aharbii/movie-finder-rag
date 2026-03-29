@@ -39,14 +39,14 @@ def interactive_retrieve() -> None:
         try:
             print("\n" + "-" * 40)
             query = input("🔍 Enter your movie search query: ").strip()
-            
+
             if query.lower() in ["exit", "quit"]:
                 break
             if not query:
                 continue
 
             print("⏳ Embedding query and searching...")
-            
+
             # Embed the search query
             query_vector = provider.embed(query)
             if not query_vector:

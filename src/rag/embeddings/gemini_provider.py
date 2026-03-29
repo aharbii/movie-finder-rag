@@ -1,4 +1,3 @@
-import sys
 from typing import cast
 
 from google import genai
@@ -45,7 +44,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         return EmbeddingModelMetadata(
             name=self.model,
             dimension=768,  # Default for Gemini text-embedding-004
-            cost_per_1k_tokens=0.0
+            cost_per_1k_tokens=0.0,
         )
 
     def embed(self, text: str) -> list[float]:

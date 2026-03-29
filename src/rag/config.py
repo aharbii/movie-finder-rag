@@ -9,14 +9,10 @@ class RAGConfig(BaseSettings):
     Project-wide settings and configuration managed by Pydantic.
     """
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Qdrant Cloud (Write-capable key)
-    qdrant_url: str = Field(
-        ..., validation_alias=AliasChoices("QDRANT_URL", "QDRANT_ENDPOINT")
-    )
+    qdrant_url: str = Field(..., validation_alias=AliasChoices("QDRANT_URL", "QDRANT_ENDPOINT"))
     qdrant_api_key_rw: str = Field(
         ..., validation_alias=AliasChoices("QDRANT_API_KEY_RW", "QDRANT_API_KEY")
     )

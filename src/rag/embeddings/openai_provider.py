@@ -59,11 +59,9 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         metadata = self.MODELS.get(self.model)
         if metadata:
             return metadata
-        
+
         return EmbeddingModelMetadata(
-            name=self.model,
-            dimension=settings.embedding_dimension,
-            cost_per_1k_tokens=0.0
+            name=self.model, dimension=settings.embedding_dimension, cost_per_1k_tokens=0.0
         )
 
     def embed(self, text: str) -> list[float]:
