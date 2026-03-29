@@ -1,11 +1,16 @@
 {
-  // ── Python interpreter ────────────────────────────────────────────────────
-  // rag_ingestion/ is a standalone uv project (not a workspace member).
-  // Run `uv sync` from this directory to create the local .venv.
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-  "python.terminal.activateEnvironment": true,
+  // Host commands go through `make ...` tasks.
+  // Python-powered editor features assume VS Code is attached to the running
+  // `rag` container after `make up`.
+  "python.defaultInterpreterPath": "/opt/venv/bin/python",
+  "python.terminal.activateEnvironment": false,
+  "python.envFile": "${workspaceFolder}/.env",
 
-  // ── Ruff ──────────────────────────────────────────────────────────────────
+  // The repo is a standalone package, so expose only its source root inside the
+  // attached container.
+  "python.analysis.extraPaths": ["${workspaceFolder}/src"],
+  "python.analysis.autoImportCompletions": true,
+
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
@@ -16,26 +21,25 @@
   },
   "ruff.importStrategy": "fromEnvironment",
 
-  // ── mypy ─────────────────────────────────────────────────────────────────
   "mypy-type-checker.importStrategy": "fromEnvironment",
   "mypy-type-checker.args": ["--strict"],
 
-  // ── Editor ────────────────────────────────────────────────────────────────
   "editor.rulers": [100],
   "editor.tabSize": 4,
+  "editor.insertSpaces": true,
 
-  // ── File explorer ─────────────────────────────────────────────────────────
   "files.exclude": {
     "**/__pycache__": true,
     "**/.mypy_cache": true,
     "**/.ruff_cache": true,
     "**/*.pyc": true,
     "**/.pytest_cache": true,
-    "**/ingestion-outputs.env": false  // keep visible — Jenkins artifact
+    "**/htmlcov": true
   },
 
-  // ── Test discovery ────────────────────────────────────────────────────────
   "python.testing.pytestEnabled": true,
-  "python.testing.pytestArgs": ["-v"],
+  "python.testing.pytestArgs": ["tests/", "-v"],
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
   "python.testing.unittestEnabled": false
 }

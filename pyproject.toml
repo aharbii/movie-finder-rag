@@ -1,5 +1,5 @@
 [project]
-name = "rag-ingestion"
+name = "movie-finder-rag"
 version = "0.1.0"
 description = "AI/Data ingestion pipeline — embeds Kaggle movie dataset into a Qdrant vector store"
 readme = "README.md"
@@ -10,7 +10,9 @@ dependencies = [
     "openai>=2.29.0",
     "pandas>=3.0.1",
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.7.0",
     "qdrant-client>=1.17.1",
+    "tqdm>=4.66.0",
 ]
 
 [dependency-groups]
@@ -25,10 +27,13 @@ test = [
 dev = [
     { include-group = "lint" },
     { include-group = "test" },
+    "pre-commit>=4.2.0",
+    "detect-secrets>=1.5.0",
 ]
 
 [tool.uv]
 default-groups = []
+packages = ["src/rag"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -39,23 +44,19 @@ line-length = 100
 target-version = "py313"
 
 [tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "UP",  # pyupgrade
-]
-ignore = ["E501", "B008"] # Ignore line length and function calls in defaults (FastAPI)
+# Synchronized with backend PR #15 DNA
+select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM"]
+ignore = ["E501", "B008", "N818"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 
 [tool.mypy]
-files = ["src"]
 python_version = "3.13"
+mypy_path = "src"
+explicit_package_bases = true
+namespace_packages = true
 check_untyped_defs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
@@ -63,3 +64,7 @@ warn_return_any = true
 warn_unused_ignores = true
 show_error_codes = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

@@ -1,143 +1,125 @@
 # movie-finder-rag
 
-AI/Data ingestion pipeline — downloads the [Wikipedia Movie Plots](https://www.kaggle.com/datasets/jrobischon/wikipedia-movie-plots) Kaggle dataset, embeds it with OpenAI, and loads it into a Qdrant vector store.
+Offline ingestion pipeline for Movie Finder. Downloads the [Wikipedia Movie Plots](https://www.kaggle.com/datasets/jrobischon/wikipedia-movie-plots) Kaggle dataset, generates OpenAI embeddings, and upserts them into a Qdrant Cloud collection.
 
-This package is maintained by the **AI/Data Engineering team** and is a prerequisite for the `chain` package.
+Contributor workflow in this repo is **strictly Docker-only**: all quality gates (lint,
+test, typecheck, test-coverage, pre-commit) execute through the provided `Makefile`.
+Host-managed Python environments are not supported for development.
 
 ---
 
 ## Overview
 
-```
-Kaggle CSV → CSV Loader → Embedding Provider → Vector Store
-               (pandas)    (OpenAI / Gemini)   (Qdrant / ChromaDB)
+```text
+Kaggle CSV -> CSV Loader -> Embedding Provider -> Qdrant Cloud
+               (pandas)      (OpenAI/Gemini)      (write-capable key)
 ```
 
-The pipeline is designed to be re-run whenever the dataset is updated or a new embedding model is tested.
+The pipeline is re-runnable whenever the dataset changes or a fresh collection needs to be built
+for the `chain` package.
 
 ---
 
-## Repository
-
-- GitHub: `https://github.com/aharbii/movie-finder-rag`
-- Consumed by: `chain` (reads from the resulting Qdrant collection)
-
----
-
-## Setup
+## Local Workflow
 
 ### Prerequisites
 
-- Python 3.13+
-- [uv](https://docs.astral.sh/uv/) package manager
-- Docker (for local Qdrant)
-- Kaggle account + API token
+- Docker 24+ with the Compose plugin
+- GNU Make
+- Qdrant Cloud write-capable credentials
+- OpenAI API key
+- Kaggle API token (`KGAT_` prefixed token)
 
-### Install
-
-```bash
-# Production only
-uv sync --frozen --no-dev
-
-# With dev tools (lint + test)
-uv sync --group dev
-```
-
-### Configure environment
+### Setup
 
 ```bash
 cp .env.example .env
-$EDITOR .env   # fill in QDRANT_*, OPENAI_API_KEY, KAGGLE_*
+$EDITOR .env   # Fill in API keys
+
+make init
+make editor-up
 ```
+
+`make editor-up` starts the long-lived workspace container used for VS Code attach/debug flows.
+The actual ingestion pipeline is still a one-shot command.
+
+### Common Commands
+
+```bash
+make init           # build dev + runtime images
+make editor-up      # start the attached-container workspace
+make editor-down    # stop the local workspace container
+make shell          # shell into the workspace container
+
+make lint           # ruff check
+make format         # ruff format
+make typecheck      # mypy src (hardened DNA)
+make test           # pytest tests/
+make test-coverage  # pytest + coverage.xml + htmlcov
+make pre-commit     # repo hooks inside Docker
+make check          # lint + typecheck + test
+```
+
+### Ingestion
+
+```bash
+make ingest
+```
+
+`make ingest` runs the runtime image against external Qdrant Cloud using the variables in `.env`.
+No local Qdrant compose workflow exists in this repo.
 
 ---
 
-## Running
+## VS Code
 
-### Local (with local Qdrant)
+The committed `.vscode/` config assumes this workflow:
 
-```bash
-docker compose up qdrant -d
-QDRANT_ENDPOINT=http://localhost:6333 QDRANT_API_KEY="" python -m src.main
-```
+1. Run `make editor-up` from the host workspace.
+2. Use `Dev Containers: Attach to Running Container...`.
+3. Attach to the `rag` service container started from this repo.
+4. Use the committed tasks for `make ...` targets.
+5. Use the committed launch configs for ingestion or pytest inside the container.
 
-### Against Qdrant Cloud
-
-```bash
-# Fill QDRANT_ENDPOINT + QDRANT_API_KEY in .env
-python -m src.main
-```
-
-### Via Docker
-
-```bash
-docker build -t movie-finder-rag .
-docker run --rm --env-file .env movie-finder-rag
-
-# Or with docker compose (local Qdrant):
-docker compose --profile run up --build ingestion
-```
+The interpreter path inside the container is `/opt/venv/bin/python`.
 
 ---
 
-## Testing
+## Environment
 
-```bash
-uv sync --group test && uv run pytest tests/ -v
-```
+Canonical variables for this repo (DNA aligned with `infrastructure#9`):
 
-## Linting
-
-```bash
-uv sync --group lint
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
-uv run mypy src/
-```
+| Variable | Required | Description |
+|---|---|---|
+| `QDRANT_URL` | Yes | Qdrant Cloud cluster URL |
+| `QDRANT_API_KEY_RW` | Yes | Write-capable Qdrant API key |
+| `QDRANT_COLLECTION_NAME` | Yes | Shared collection name consumed by `chain` |
+| `OPENAI_API_KEY` | Yes | OpenAI API key for embeddings |
+| `KAGGLE_API_TOKEN` | Yes | Standalone token prefixed with `KGAT_` |
 
 ---
 
-## Configuration
+## CI/CD Pipeline
 
-All configuration via environment variables (see `.env.example`):
+See `Jenkinsfile` for the full pipeline. The current stages line up with the repo-local
+developer contract:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `QDRANT_ENDPOINT` | Yes | — | Qdrant endpoint URL |
-| `QDRANT_API_KEY` | Yes | — | Qdrant API key (empty for local) |
-| `QDRANT_COLLECTION` | No | `movies` | Target collection name |
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key for embeddings |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-large` | Embedding model |
-| `EMBEDDING_DIMENSION` | No | `3072` | Vector dimension |
-| `KAGGLE_USERNAME` | Yes | — | Kaggle username |
-| `KAGGLE_KEY` | Yes | — | Kaggle API key |
-| `VECTOR_STORE` | No | `qdrant` | `qdrant` or `chromadb` |
+| Stage | Command / trigger | Notes |
+|---|---|---|
+| Lint + Typecheck | `make lint` + `make typecheck` | PRs, `main`, tags |
+| Test | `make test-coverage` | PRs, `main`, tags |
+| Build Image | `docker build --target runtime ...` | `main` and tags |
+| Ingest | Manual `RUN_INGESTION=true` | Triggered via Jenkins parameters |
 
 ---
 
-## Sharing outputs with the chain team
+## Sharing Outputs With Chain
 
-After a successful ingestion run, share these values with the chain team **via Jenkins credentials store** (not plain text):
+After a successful ingestion run, share these values with the chain team:
 
-```
-QDRANT_ENDPOINT=<qdrant-cloud-endpoint>
-QDRANT_API_KEY=<qdrant-api-key>
-QDRANT_COLLECTION=<collection-name>
+```text
+QDRANT_URL=<qdrant-cloud-endpoint>
+QDRANT_COLLECTION_NAME=<collection-name>
 EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_DIMENSION=3072
 ```
-
----
-
-## CI/CD
-
-See `Jenkinsfile` for the full pipeline.
-
-| Stage | Trigger | Description |
-|---|---|---|
-| Lint | Every PR + tag | ruff + mypy |
-| Test | Every PR + tag | pytest + coverage |
-| Build Image | `main` + tags | Docker build + push |
-| Ingest | Manual (`RUN_INGESTION=true`) | Full dataset ingestion |
-
-Manual ingest trigger: Jenkins → Build with Parameters → check `RUN_INGESTION`.

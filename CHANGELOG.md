@@ -8,8 +8,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-<!-- Add new changes here under the appropriate subsection. -->
-<!-- Subsections: Added, Changed, Deprecated, Removed, Fixed, Security -->
+### Added
+
+- `Makefile` — Docker-only repo contract for `init`, `up`, `down`, `logs`, `shell`, `lint`,
+  `format`, `typecheck`, `test`, `test-coverage`, `pre-commit`, and `ingest`
+
+### Changed
+
+- `Dockerfile`, `docker-compose.yml`, `.env.example`, `Jenkinsfile`, and `.vscode/*` now align
+  with the shared Docker-only local-development contract from `movie-finder#35`
+- Qdrant configuration now uses the canonical `QDRANT_URL`, `QDRANT_API_KEY_RW`, and
+  `QDRANT_COLLECTION_NAME` contract, with temporary legacy fallback in code
+- Tests now use stubbed Qdrant clients instead of real external API calls so CI can run without
+  live Qdrant/OpenAI credentials
+
+### Removed
+
+- Local Qdrant compose workflow and contributor-facing docs that depended on host `uv`
 
 ---
 

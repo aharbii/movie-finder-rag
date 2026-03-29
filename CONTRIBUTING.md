@@ -1,14 +1,11 @@
 # Contributing to movie-finder-rag
 
-The rag_ingestion project is a **one-shot batch pipeline** that downloads the Wikipedia Movie Plots dataset from Kaggle, embeds it with an embedding provider, and loads it into a vector store (Qdrant or ChromaDB). It is the data backbone for the `chain` package.
-
-For org-wide conventions (branching, commits, PRs, release process, issue/PR template inspection,
-and AI disclosure in PR descriptions or AI-assisted reviews) see the
-[backend CONTRIBUTING.md](../CONTRIBUTING.md).
+`rag_ingestion` is the offline Movie Finder ingestion pipeline. It downloads the Wikipedia Movie
+Plots dataset from Kaggle, embeds each record with OpenAI/Gemini, and writes vectors into Qdrant Cloud.
 
 ---
 
-## Table of contents
+## Table of Contents
 
 1. [Development setup](#development-setup)
 2. [Project structure](#project-structure)
@@ -16,233 +13,165 @@ and AI disclosure in PR descriptions or AI-assisted reviews) see the
 4. [Adding an embedding provider](#adding-an-embedding-provider)
 5. [Adding a vector store backend](#adding-a-vector-store-backend)
 6. [Testing strategy](#testing-strategy)
-7. [Triggering ingestion via Jenkins](#triggering-ingestion-via-jenkins)
+7. [CI/CD pipeline](#ci-cd-pipeline)
 8. [Sharing outputs with the chain team](#sharing-outputs-with-the-chain-team)
 
 ---
 
-## Development setup
+## Development Setup
 
-The rag_ingestion project is a **standalone repo** — it is NOT part of the backend uv workspace. It has its own `uv.lock`.
+This repository is intentionally outside the backend `uv` workspace, but local development is
+strictly Docker-only. Do not document or rely on host Python environments here.
 
 ```bash
 cd rag_ingestion/
-uv sync --group dev
-cp .env.example .env && $EDITOR .env
-uv run pre-commit install
+cp .env.example .env
+$EDITOR .env
 
-# Start local Qdrant for development
-docker compose up qdrant -d
+make init
+make editor-up
 ```
+
+Use `make shell` if you need an interactive shell inside the workspace container, then use the
+committed VS Code tasks or launch configs from an attached container.
 
 ### Required environment variables
 
-```
-# Vector store
-QDRANT_ENDPOINT=http://localhost:6333   # or Qdrant Cloud URL
-QDRANT_API_KEY=                         # empty for local
-QDRANT_COLLECTION=movies
+```bash
+# Qdrant Cloud (write-capable key)
+QDRANT_URL=https://your-cluster.qdrant.io
+QDRANT_API_KEY_RW=
+QDRANT_COLLECTION_NAME=movies
 
-# Embeddings
-OPENAI_API_KEY=sk-
-EMBEDDING_MODEL=text-embedding-3-large
-EMBEDDING_DIMENSION=3072
+# OpenAI embeddings
+OPENAI_API_KEY=sk-...
 
-# Kaggle (for dataset download)
-KAGGLE_USERNAME=
-KAGGLE_KEY=                             # from kaggle.com → Settings → API
+# Kaggle dataset download
+KAGGLE_API_TOKEN=KGAT_...
 ```
 
 ---
 
-## Project structure
+## Project Structure
 
-```
+```text
 rag_ingestion/
 ├── src/
-│   ├── main.py               ← entry point: orchestrates the full pipeline
-│   ├── dataset/
-│   │   ├── __init__.py
-│   │   └── dataset.py        ← download_data() from Kaggle via kagglehub
-│   ├── embeddings/
-│   │   ├── base.py           ← EmbeddingProvider ABC
-│   │   ├── openai_provider.py   ← OpenAI text-embedding-* implementation
-│   │   └── gemini_provider.py   ← Google Gemini implementation
-│   ├── ingestion/
-│   │   ├── csv_loader.py     ← load_movies() from CSV → list[Movie]
-│   │   └── pipeline.py       ← ingest_csv() orchestrator
-│   ├── models/
-│   │   └── movie.py          ← Movie Pydantic model
-│   ├── vectorstore/
-│   │   ├── base.py           ← VectorStore ABC
-│   │   ├── qdrant_vectorstore.py    ← Qdrant Cloud implementation
-│   │   └── chromadb_vectorstore.py  ← local ChromaDB implementation
-│   └── utils/
-│       └── logger.py         ← get_logger factory
-├── scripts/
-│   └── backup_vectorstore.py ← Qdrant → ChromaDB migration utility
-└── tests/
-    └── test_rag.py
+│   └── rag/             # Package source
+├── scripts/             # Utility scripts (backup, retrieve)
+├── tests/               # Unit tests
+├── Dockerfile           # Multi-stage build (dev, builder, runtime)
+├── docker-compose.yml   # Local development stack
+├── Makefile             # Docker-backed developer contract
+└── .vscode/             # Attached-container editor configuration
 ```
 
 ### Import note
 
-This project uses **flat imports** — modules import each other without the `src.` prefix (e.g. `from embeddings.base import EmbeddingProvider`). Always run Python with `PYTHONPATH=src` or use `uv run` which picks it up from `[tool.pytest.ini_options] pythonpath = ["src"]`.
+This project uses the `src-layout`. Imports must use the absolute package name:
+`from rag.module import member`.
+
+---
+
+## Running the Pipeline
+
+### Supported local path
 
 ```bash
-# correct
-PYTHONPATH=src python -m main
-uv run python -m main        # uv handles PYTHONPATH automatically via pyproject.toml
+make ingest
+```
 
-# wrong
-python src/main.py           # imports will fail
+This runs the runtime image against external Qdrant Cloud using the values in `.env`.
+
+### Common quality commands
+
+```bash
+make lint           # ruff check
+make format         # ruff format
+make typecheck      # mypy src (hardened DNA)
+make test           # pytest
+make test-coverage  # pytest + reports
+make check          # lint + typecheck + test
 ```
 
 ---
 
-## Running the pipeline
+## Adding an Embedding Provider
 
-### Local (against local Qdrant)
+This project follows the **Strategy Pattern** for embedding providers. To add a new one:
 
-```bash
-docker compose up qdrant -d
-PYTHONPATH=src uv run python -m main
-```
+1.  **Interface**: Ensure your provider implements the `EmbeddingProvider` abstract base class found in `src/rag/embeddings/base.py`.
+2.  **Implementation**: Create a new file in `src/rag/embeddings/` (e.g., `my_provider.py`).
+3.  **Wiring**: Add the provider to the selection logic in `src/rag/main.py`.
+4.  **Configuration**: If the provider requires new secrets, update `src/rag/config.py` (Pydantic `RAGConfig`), `.env.example`, and the documentation.
 
-### Against Qdrant Cloud
-
-Fill `QDRANT_ENDPOINT` and `QDRANT_API_KEY` in `.env`, then:
-
-```bash
-uv run python -m main
-```
-
-### Via Docker
-
-```bash
-docker build -t movie-finder-rag .
-docker run --rm --env-file .env movie-finder-rag
-
-# Using docker compose (local Qdrant):
-docker compose --profile run up --build ingestion
-```
-
----
-
-## Adding an embedding provider
-
-1. **Create** `src/embeddings/my_provider.py` implementing `EmbeddingProvider`:
-
+Example:
 ```python
-from embeddings.base import EmbeddingProvider
+from rag.embeddings.base import EmbeddingProvider, EmbeddingModel, EmbeddingModelUsage
 
-class MyEmbeddingProvider(EmbeddingProvider):
-    def __init__(self, model: str, **kwargs):
-        self.model = model
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Embed a batch of texts. Returns one vector per text."""
-        # call your embedding API here
-        return [[0.0] * 1536 for _ in texts]   # placeholder
-
+class MyProvider(EmbeddingProvider):
     @property
-    def dimension(self) -> int:
-        return 1536
+    def model_info(self) -> EmbeddingModel:
+        return EmbeddingModel(name="my-model", embedding_dimension=1536)
+
+    def embed(self, text: str) -> list[float]:
+        # Implementation...
+        pass
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        # Implementation...
+        pass
+
+    def get_model_usage(self) -> EmbeddingModelUsage:
+        return self._usage
 ```
-
-2. **Export** from `src/embeddings/__init__.py`.
-
-3. **Wire up** in `src/main.py`:
-
-```python
-from embeddings.my_provider import MyEmbeddingProvider
-
-# swap out the provider:
-embedding_provider = MyEmbeddingProvider(model="my-model")
-```
-
-4. **Add tests** in `tests/` mocking the external API call.
-
-5. **Add env vars** to `.env.example` and `rag_ingestion/.env.example` if the provider needs credentials.
 
 ---
 
-## Adding a vector store backend
+## Adding a Vector Store Backend
 
-1. **Create** `src/vectorstore/my_store.py` implementing `VectorStore`:
+Vector store backends are abstracted via the `VectorStore` interface in `src/rag/vectorstore/base.py`.
 
-```python
-from vectorstore.base import VectorStore
-from models.movie import Movie
-
-class MyVectorStore(VectorStore):
-    def upsert(self, movies: list[Movie], vectors: list[list[float]]) -> None:
-        """Insert or update movie vectors. Called once per batch."""
-        ...
-
-    def collection_exists(self) -> bool:
-        """Return True if the target collection already exists."""
-        ...
-```
-
-2. **Wire up** in `src/main.py` alongside existing implementations.
-
-3. **Add env vars** to `.env.example` for any connection config.
+1.  **Implementation**: Create a new module in `src/rag/vectorstore/` implementing the required `upsert`, `upsert_batch`, and `search` methods.
+2.  **DNA Alignment**: Ensure your implementation uses `from rag.utils.logger import get_logger` and handles configuration via `from rag.config import settings`.
+3.  **Error Handling**: Do not use `sys.exit()`. Raise descriptive exceptions or implement retry logic using the project's standard patterns.
 
 ---
 
-## Testing strategy
+## Testing Strategy
 
-**Rule: no real API calls or file I/O** in unit tests.
+The CI contract for this repo is stubbed. Tests must pass without live OpenAI, Qdrant, or Kaggle
+credentials.
 
-```bash
-# Run all tests
-uv sync --group test && PYTHONPATH=src uv run pytest tests/ -v
+Follow these rules:
 
-# With coverage
-PYTHONPATH=src uv run pytest tests/ --cov=src --cov-report=term-missing
-```
-
-Mock patterns to follow:
-- Kaggle download: `mocker.patch("dataset.dataset.kagglehub.dataset_download")`
-- OpenAI embeddings: `mocker.patch("embeddings.openai_provider.OpenAI")`
-- Qdrant client: `mocker.patch("vectorstore.qdrant_vectorstore.QdrantClient")`
+- No real OpenAI, Qdrant, or Kaggle network calls in unit tests
+- Mock at the SDK/client boundary
+- Prefer focused tests for env resolution and provider/store behavior
 
 ---
 
-## Triggering ingestion via Jenkins
+## CI/CD Pipeline
 
-The `Ingest` stage in `Jenkinsfile` is **manual-only** — it does not run on every PR.
+The Jenkins pipeline executes through the Docker Makefile to ensure environment parity between
+local and CI runs.
 
-**To trigger a new ingestion run:**
-
-1. Open the `movie-finder-rag` pipeline in Jenkins
-2. Click **Build with Parameters**
-3. Set the parameters:
-   - `RUN_INGESTION` = **true**
-   - `COLLECTION_NAME` = name for the new collection (e.g. `movies-v2`)
-   - `VECTOR_STORE` = `qdrant` (or `chromadb` for a local test run)
-   - `FORCE_DOWNLOAD` = `true` if you want to re-download the dataset
-4. Click **Build**
-
-After a successful run, Jenkins archives an `ingestion-outputs.env` artifact containing the collection name and model used.
+| Stage | Command / trigger | Notes |
+|---|---|---|
+| Lint + Typecheck | `make lint` + `make typecheck` | PRs, `main`, tags |
+| Test | `make test-coverage` | PRs, `main`, tags |
+| Build Image | `docker build --target runtime ...` | `main` and tags |
+| Ingest | Manual `RUN_INGESTION=true` | Triggered via Jenkins parameters |
 
 ---
 
-## Sharing outputs with the chain team
+## Sharing Outputs With The Chain Team
 
-After a successful ingestion run, share these values with the chain team **via Jenkins credentials store** — never via Slack, email, or plain text:
+After a successful ingest, share these metadata values with the chain team:
 
-```
-QDRANT_ENDPOINT=<cloud-endpoint>       ← rarely changes
-QDRANT_API_KEY=<api-key>               ← rarely changes
-QDRANT_COLLECTION=<new-collection>     ← changes with each ingest run
-EMBEDDING_MODEL=text-embedding-3-large ← confirm the model used
+```text
+QDRANT_URL=<cloud-endpoint>
+QDRANT_COLLECTION_NAME=<new-collection>
+EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_DIMENSION=3072
 ```
-
-**Handoff steps:**
-1. Download the `ingestion-outputs.env` artifact from the Jenkins build
-2. Update the `qdrant-collection` Jenkins credential in the chain repo pipeline
-3. Notify the chain team (Slack / ticket) that new vectors are available
-4. The chain team's next build automatically picks up the new collection

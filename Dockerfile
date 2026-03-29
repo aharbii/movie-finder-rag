@@ -1,48 +1,81 @@
 # =============================================================================
-# rag_ingestion — batch job Dockerfile
+# movie-finder-rag — Docker-only local development and runtime images
 #
-# This is a one-shot batch container, not a long-running server.
-# Run via docker compose run ingestion  or  docker run <image>
-#
-# Build context: rag_ingestion/  (standalone — has its own uv.lock)
+# Targets:
+#   dev      Attached-container image used by docker-compose.yml and VS Code
+#   builder  Intermediate dependency synchronization stage
+#   runtime  One-shot ingestion image used by Jenkins and `make ingest`
 # =============================================================================
 
-# ---- Stage 1: builder -------------------------------------------------------
-FROM python:3.13-slim AS builder
+FROM python:3.13-slim AS uv-base
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /usr/local/bin/uv
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_LINK_MODE=copy
+
+
+# ---- Stage 1: dev -----------------------------------------------------------
+FROM uv-base AS dev
+
+WORKDIR /workspace
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    VIRTUAL_ENV="/opt/venv" \
+    PYTHONPATH="/workspace/src"
+
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --group dev --active --no-install-project --no-install-workspace
+
+CMD ["sleep", "infinity"]
+
+
+# ---- Stage 2: builder -------------------------------------------------------
+FROM uv-base AS builder
 
 WORKDIR /build
 
-# Copy dependency manifests first — optimal layer caching
 COPY pyproject.toml uv.lock ./
 
-# Sync only production dependencies into /build/.venv
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --no-install-project --no-install-workspace
 
-# ---- Stage 2: runtime -------------------------------------------------------
+COPY src/ src/
+COPY scripts/ scripts/
+
+
+# ---- Stage 3: runtime -------------------------------------------------------
 FROM python:3.13-slim AS runtime
 
-LABEL org.opencontainers.image.title="rag-ingestion"
-LABEL org.opencontainers.image.description="Movie dataset ingestion pipeline — embeds and loads into Qdrant"
+LABEL org.opencontainers.image.source="https://github.com/aharbii/movie-finder-rag"
+LABEL org.opencontainers.image.description="Movie Finder offline RAG ingestion pipeline"
+LABEL org.opencontainers.image.licenses="MIT"
 
-# Non-root user for security
-RUN useradd --system --uid 1001 --no-create-home appuser
+RUN useradd --system --uid 1001 --create-home --home-dir /home/appuser appuser
 
 WORKDIR /app
 
-# Copy the virtualenv and source code
-COPY --from=builder /build/.venv /app/.venv
-COPY src/ src/
+COPY --link --from=builder /build/.venv /app/.venv
+COPY --link --from=builder /build/src ./src
+COPY --link --from=builder /build/scripts ./scripts
 
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV HOME="/home/appuser" \
+    PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app/src" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+RUN mkdir -p /app/dataset && chown -R appuser:appuser /app /home/appuser
+
 USER appuser
 
-# Batch job entry point — runs the full ingestion pipeline
-ENTRYPOINT ["python", "-m", "src.main"]
+ENTRYPOINT ["python", "-m", "rag.main"]

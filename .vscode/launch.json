@@ -1,38 +1,59 @@
 {
   "version": "0.2.0",
   "configurations": [
-    // ── Run full ingestion pipeline ─────────────────────────────────────────
     {
-      "name": "ingestion: run pipeline",
+      "name": "ingestion: run pipeline (rag container)",
       "type": "debugpy",
       "request": "launch",
-      "module": "src.main",
+      "module": "rag.main",
       "envFile": "${workspaceFolder}/.env",
-      "python": "${workspaceFolder}/.venv/bin/python",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "python": "/opt/venv/bin/python",
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal"
+      "justMyCode": false
     },
-
-    // ── pytest ──────────────────────────────────────────────────────────────
     {
-      "name": "pytest: All tests",
+      "name": "pytest: all tests (rag container)",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": ["tests/", "-v"],
       "envFile": "${workspaceFolder}/.env",
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "cwd": "${workspaceFolder}"
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "python": "/opt/venv/bin/python",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
     },
     {
-      "name": "pytest: Current file",
+      "name": "pytest: current file (rag container)",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": ["${file}", "-v"],
       "envFile": "${workspaceFolder}/.env",
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "cwd": "${workspaceFolder}"
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "python": "/opt/venv/bin/python",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "pytest: tests with coverage (rag container)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/",
+        "-v",
+        "--cov=rag",
+        "--cov-report=term-missing",
+        "--cov-report=xml:coverage.xml",
+        "--cov-report=html:htmlcov"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "python": "/opt/venv/bin/python",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
     }
   ]
 }

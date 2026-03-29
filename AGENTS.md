@@ -5,8 +5,8 @@ Foundational mandate for `movie-finder-rag` (`backend/rag_ingestion/`).
 ---
 
 ## What this submodule does
-Offline RAG ingestion pipeline. Downloads Kaggle data → Embeddings → Qdrant.
-Runs as a standalone `uv` project.
+Offline RAG ingestion pipeline. Downloads Kaggle data, generates embeddings, and writes to
+Qdrant Cloud. Local development follows the Docker-only repo contract.
 
 ---
 
@@ -14,6 +14,7 @@ Runs as a standalone `uv` project.
 - Python 3.13, `kagglehub`, `pandas`
 - OpenAI `text-embedding-3-large`
 - Qdrant Cloud
+- Docker Compose + Make for local workflows
 
 ---
 
@@ -24,9 +25,11 @@ Runs as a standalone `uv` project.
 ---
 
 ## Common tasks
-- `uv sync` to create local `.venv`.
-- `uv run pre-commit run --all-files`.
-- `pytest --cov`.
+- `make init`
+- `make up`
+- `make test-coverage`
+- `make pre-commit`
+- `make ingest`
 
 ---
 
@@ -52,10 +55,11 @@ Runs as a standalone `uv` project.
 ## VSCode setup
 
 `backend/rag_ingestion/.vscode/` — full workspace configuration for rag_ingestion only.
-- Interpreter: `rag_ingestion/.venv/bin/python` (standalone — run `uv sync` from this directory)
-- `launch.json`: ingestion pipeline runner + pytest all/current file
-- `tasks.json`: lint, test, pre-commit, dry run
-- This is a **standalone uv project** (not a workspace member). Interpreter path differs from other backend packages.
-- Modifying configs: `options.cwd` must point to this directory when called from parent workspaces.
-  Update `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, and the repo's `.github/copilot-instructions.md`
-  after.
+- Tasks call `make ...` from this directory
+- Interpreter: `/opt/venv/bin/python` inside the attached `rag` container
+- `launch.json`: ingestion pipeline + pytest profiles for the attached container
+- `tasks.json`: init, up, down, logs, shell, lint, format, typecheck, test, coverage, pre-commit,
+  ingest
+- Modifying configs: `options.cwd` must point to this directory when called from parent
+  workspaces. Update `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, and the repo's
+  `.github/copilot-instructions.md` after.
