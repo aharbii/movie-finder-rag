@@ -160,54 +160,20 @@ Conventional Commits: `feat(rag): add Gemini embedding provider`
 
 ## Cross-cutting change checklist
 
-### 1. GitHub issues
-- [ ] `aharbii/movie-finder` (parent)
-- [ ] `aharbii/movie-finder-rag` linked child issue only if this repo changes
-- [ ] Matching issue/PR templates and a recent example were inspected before filing or editing
+Full detail in `ai-context/issue-agent-briefing-template.md`.
 
-### 2. Branch
-- [ ] Branch in this repo
-- [ ] `chore/` branch in `backend/` and root `movie-finder` to bump pointers after merge
-- [ ] New standalone issues branch from `main` unless stacking is explicitly requested
-
-### 3. ADR
-- [ ] New embedding provider, new vector store, or new external dependency?
-  → Write `docs/architecture/decisions/ADR-NNN-title.md` (template in `decisions/index.md`)
-
-### 4. Implementation and tests
-- [ ] New provider follows the Strategy pattern
-- [ ] `ruff` + `mypy --strict` pass
-- [ ] Pre-commit hooks pass (`make pre-commit`)
-- [ ] `pytest --cov` passes with no regression
-
-### 5. Environment and secrets
-- [ ] `.env.example` updated in: **this repo**, `backend/`, `backend/chain/` (if embedding model is shared), root `movie-finder`
-- [ ] New API keys flagged to user for manual addition to:
-  - Azure Key Vault
-  - Jenkins credentials store (`docs/devops-setup.md` credentials table)
-  - GitHub repository secrets (future)
-- [ ] Jenkins `Jenkinsfile` credentials list updated if new secrets needed at CI time
-
-### 6. Docker
-- [ ] `Dockerfile` updated (new deps, new build args, new env vars)
-- [ ] `docker-compose.yml` updated if service interface changed
-- [ ] Root `docker-compose.yml` updated if needed
-
-### 7. CI — Jenkins
-- [ ] `.github/workflows/*.yml` and/or `Jenkinsfile` reviewed — new stages, credentials, permissions, or parameters?
-- [ ] `ingestion-outputs.env` artifact format still valid (chain team depends on it)
-
-### 8. Architecture diagrams (in `docs/` submodule)
-- [ ] **PlantUML** — update `02-system-architecture.puml` or `03-backend-architecture.puml` if provider list changes
-  **Never generate `.mdj`** — user syncs to StarUML manually
-- [ ] **Structurizr C4** — update `workspace.dsl` if new external system added (e.g., Google AI)
-- [ ] Commit to `aharbii/movie-finder-docs` first, then bump `docs/` pointer in root
-
-### 9. Documentation
-- [ ] `docs/` pages updated (ingestion guide, embedding configuration)
-- [ ] `README.md` updated (new provider, new env vars, new usage)
-- [ ] `CHANGELOG.md` updated under `[Unreleased]`
-- [ ] Contributor docs updated when CI, required checks, or merge policy change
+| # | Category | Key gate |
+|---|---|---|
+| 1 | **Issues** | Parent `aharbii/movie-finder` + child here only if this repo changes; templates inspected |
+| 2 | **Branch** | `feature/fix/chore/docs` in this repo + pointer-bump `chore/` in `backend/` and root |
+| 3 | **ADR** | New embedding provider, new vector store, or new external dep → ADR in `docs/` |
+| 4 | **Implementation** | Strategy pattern for new providers; `ruff`+`mypy --strict` pass; pre-commit pass |
+| 5 | **Tests** | `pytest --cov` passes; coverage doesn't regress |
+| 6 | **Env & secrets** | `.env.example` updated here + `backend/` + `chain/` if embedding model shared + root; new keys → Key Vault + Jenkins |
+| 7 | **Docker** | `Dockerfile` + `docker-compose.yml` updated for dep/env changes |
+| 8 | **CI** | `Jenkinsfile` reviewed; `ingestion-outputs.env` artifact format still valid |
+| 9 | **Diagrams** | `02-system-architecture.puml` or `03-backend-architecture.puml` if provider changes; `workspace.dsl` if new external system; commit to `docs/` first; **never `.mdj`** |
+| 9a | **Docs** | `docs/` pages (ingestion guide, embedding config); `README.md` + `CHANGELOG.md` updated |
 
 ### 10. Sibling submodules likely affected
 | Submodule | Why |
