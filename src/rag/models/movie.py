@@ -10,6 +10,6 @@ class Movie(BaseModel):
     title: str = Field(..., description="Movie title")
     release_year: int = Field(..., description="Year of release")
     director: str = Field(..., description="Director name")
-    genre: str = Field(..., description="Movie genre")
-    cast: str = Field(..., description="Cast list")
+    genre: list[str] = Field(..., description="Movie genre")
+    cast: list[str] = Field(..., description="Cast list")
     plot: str = Field(..., description="Detailed plot description used for embedding")

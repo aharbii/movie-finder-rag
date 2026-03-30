@@ -64,7 +64,8 @@ def interactive_retrieve() -> None:
                 for idx, movie in enumerate(results, 1):
                     print(f"\n{idx}. 🎬 {movie.title} ({movie.release_year})")
                     print(f"   👤 Director: {movie.director}")
-                    print(f"   🎭 Genre:    {movie.genre}")
+                    print(f"   🎭 Genre:    {', '.join(movie.genre)}")
+                    print(f"   👥 Cast:     {', '.join(movie.cast[:5])}...")
                     print(f"   📝 Snippet:  {movie.plot[:250]}...")
                     print("   " + "." * 10)
 

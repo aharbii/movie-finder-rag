@@ -19,15 +19,14 @@ ENV PYTHONUNBUFFERED=1 \
 # ---- Stage 1: dev -----------------------------------------------------------
 FROM uv-base AS dev
 
-WORKDIR /workspace
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git zsh make curl \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure a minimal shell prompt without internet downloads.
-RUN printf 'export PS1="[rag] %n@%m:%~%% "\nalias ls="ls --color=auto"\nalias ll="ls -alF"\n' \
-    > /root/.zshrc
+RUN git config --global --add safe.directory /workspace
+
+WORKDIR /workspace
 
 RUN python -m venv /opt/venv
 
@@ -60,6 +59,7 @@ COPY scripts/ scripts/
 # ---- Stage 3: runtime -------------------------------------------------------
 FROM python:3.13-slim AS runtime
 
+LABEL org.opencontainers.image.title="movie-finder-rag"
 LABEL org.opencontainers.image.source="https://github.com/aharbii/movie-finder-rag"
 LABEL org.opencontainers.image.description="Movie Finder offline RAG ingestion pipeline"
 LABEL org.opencontainers.image.licenses="MIT"

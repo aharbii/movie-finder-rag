@@ -20,7 +20,7 @@
 
 .PHONY: help setup init up down editor-up editor-down logs shell lint format fix \
 	typecheck test test-coverage detect-secrets pre-commit ingest check \
-	build run run-dev ci-down clean
+	build run run-dev ci-down clean backup retrieve
 
 .DEFAULT_GOAL := help
 
@@ -62,7 +62,7 @@ help:
 	@echo "  Editor"
 	@echo "    editor-up      Start the attached-container workspace in the background"
 	@echo "    editor-down    Stop the local workspace container"
-	@echo "    shell          Open a zsh shell in the workspace container"
+	@echo "    shell          Open a bash shell in the workspace container"
 	@echo ""
 	@echo "  Lifecycle"
 	@echo "    up             Alias for editor-up"
@@ -90,6 +90,10 @@ help:
 	@echo "  Compatibility aliases"
 	@echo "    build / run / run-dev  Alias for init / editor-up / editor-up"
 	@echo ""
+	@echo "  Apps"
+	@echo "    backup         Creates a Backup for the Qdrant vector store in a local ChromaDB"
+	@echo "    retrieve       Runs an interactive app to validate the retrieval logic"
+	@echo ""
 
 init:
 	@if [ ! -f .env ]; then cp .env.example .env && echo ">>> .env created from .env.example"; fi
@@ -105,9 +109,6 @@ up: editor-up
 down: editor-down
 
 editor-up:
-	@if ! $(COMPOSE) images -q $(SERVICE) 2>/dev/null | grep -q .; then \
-		echo ">>> Image not found — run 'make init' first"; exit 1; \
-	fi
 	$(COMPOSE) up -d $(SERVICE)
 
 editor-down:
@@ -121,9 +122,9 @@ logs:
 
 shell:
 	@if $(COMPOSE) ps --services --status running 2>/dev/null | grep -qx "$(SERVICE)"; then \
-		$(COMPOSE) exec $(SERVICE) zsh; \
+		$(COMPOSE) exec $(SERVICE) bash; \
 	else \
-		$(COMPOSE) run --rm $(SERVICE) zsh; \
+		$(COMPOSE) run --rm $(SERVICE) bash; \
 	fi
 
 lint:
@@ -176,3 +177,9 @@ clean:
 build: init
 run: editor-up
 run-dev: editor-up
+
+backup:
+	$(call exec_or_run,python scripts/backup_vectorstore.py)
+
+retrieve:
+	$(call exec_or_run,python scripts/retrieve.py)
