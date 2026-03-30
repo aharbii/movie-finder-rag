@@ -13,13 +13,17 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-json
+        exclude: ^\.vscode/  # VSCode config files use JSONC (comments allowed)
       - id: check-ast
       - id: check-added-large-files
       - id: check-case-conflict
       - id: check-illegal-windows-names
       - id: check-merge-conflict
-      - id: detect-private-key
       - id: debug-statements
+      - id: detect-private-key
+      - id: pretty-format-json
+        exclude: ^\.vscode/
+      - id: sort-simple-yaml
 
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
@@ -31,6 +35,7 @@ repos:
     rev: v1.5.0
     hooks:
       - id: mypy
+        language_version: python3.13
         additional_dependencies:
           - pydantic
           - pydantic-settings
@@ -41,7 +46,6 @@ repos:
           - --warn-return-any
           - --warn-unused-ignores
           - --show-error-codes
-        exclude: (^tests/|/tests/)
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.13
