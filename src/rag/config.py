@@ -12,13 +12,11 @@ class RAGConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Qdrant Cloud (Write-capable key)
-    qdrant_url: str = Field(..., validation_alias=AliasChoices("QDRANT_URL", "QDRANT_ENDPOINT"))
+    qdrant_url: str = Field(..., validation_alias="QDRANT_URL")
     qdrant_api_key_rw: str = Field(
-        ..., validation_alias=AliasChoices("QDRANT_API_KEY_RW", "QDRANT_API_KEY")
+        ..., validation_alias=AliasChoices("QDRANT_API_KEY_RW", "QDRANT_API_KEY_RO")
     )
-    qdrant_collection_name: str = Field(
-        "movies", validation_alias=AliasChoices("QDRANT_COLLECTION_NAME", "QDRANT_COLLECTION")
-    )
+    qdrant_collection_name: str = Field("movies", validation_alias="QDRANT_COLLECTION_NAME")
 
     # OpenAI Embeddings
     openai_api_key: str = Field(..., validation_alias="OPENAI_API_KEY")

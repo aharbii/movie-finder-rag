@@ -94,6 +94,18 @@ make test-coverage  # pytest + reports
 make check          # lint + typecheck + test
 ```
 
+### Backup the pipeline in ChromaDB
+
+```bash
+make backup
+```
+
+### Run interactive retrieval app
+
+```bash
+make retrieve
+```
+
 ---
 
 ## Adding an Embedding Provider

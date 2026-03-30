@@ -13,7 +13,7 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-json
-        exclude: ^\.vscode/  # VSCode config files use JSONC (comments allowed)
+        exclude: ^\.vscode/ # VSCode config files use JSONC (comments allowed)
       - id: check-ast
       - id: check-added-large-files
       - id: check-case-conflict
@@ -29,7 +29,9 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        exclude: .env.example
+        args:
+          - --baseline
+          - .secrets.baseline
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.5.0

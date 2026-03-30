@@ -1,4 +1,5 @@
 import chromadb
+import numpy as np
 
 from rag.embeddings.base import EmbeddingModelMetadata
 from rag.models.movie import Movie
@@ -30,7 +31,7 @@ class ChromaDBVectorStore(VectorStore):
         )
         collection.add(
             ids=[str(movie.id)],
-            embeddings=[vector],
+            embeddings=np.asarray(vector),
             metadatas=[movie.model_dump()],
         )
 
@@ -46,7 +47,7 @@ class ChromaDBVectorStore(VectorStore):
         )
         collection.add(
             ids=[str(m.id) for m in movies],
-            embeddings=vectors,
+            embeddings=np.asarray(vectors),
             metadatas=[m.model_dump() for m in movies],
         )
 
@@ -60,7 +61,7 @@ class ChromaDBVectorStore(VectorStore):
         collection = self.client.get_or_create_collection(
             name=embedding_model.name.replace("/", "-")
         )
-        results = collection.query(query_embeddings=[query_vector], n_results=top_k)
+        results = collection.query(query_embeddings=np.asarray(query_vector), n_results=top_k)
 
         movies = []
         if results["metadatas"]:

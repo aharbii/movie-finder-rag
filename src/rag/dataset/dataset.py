@@ -3,11 +3,8 @@ import shutil
 from pathlib import Path
 
 import kagglehub
-from dotenv import load_dotenv
 
 from rag.utils.logger import get_logger
-
-load_dotenv()
 
 
 def download_data(debug: bool = False) -> str:

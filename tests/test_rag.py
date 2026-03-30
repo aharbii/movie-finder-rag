@@ -3,6 +3,7 @@ from typing import cast
 
 from pytest import MonkeyPatch
 
+from rag.config import settings
 from rag.embeddings.base import EmbeddingModelMetadata
 from rag.models.movie import Movie
 from rag.vectorstore.qdrant_vectorstore import QdrantVectorStore
@@ -12,8 +13,8 @@ def test_qdrant_vectorstore_uses_pydantic_settings(monkeypatch: MonkeyPatch) -> 
     """
     Ensure the Qdrant client is correctly initialized from Pydantic settings.
     """
-    monkeypatch.setenv("QDRANT_URL", "https://qdrant.example")
-    monkeypatch.setenv("QDRANT_API_KEY_RW", "rw-test-key")
+    monkeypatch.setattr(settings, "qdrant_url", "https://qdrant.example")
+    monkeypatch.setattr(settings, "qdrant_api_key_rw", "rw-test-key")
 
     captured: dict[str, str] = {}
 
@@ -37,9 +38,9 @@ def test_qdrant_vectorstore_batch_upsert(monkeypatch: MonkeyPatch) -> None:
     """
     Verify that batch upsert logic correctly calls the Qdrant SDK.
     """
-    monkeypatch.setenv("QDRANT_URL", "https://qdrant.example")
-    monkeypatch.setenv("QDRANT_API_KEY_RW", "rw-test-key")
-    monkeypatch.setenv("QDRANT_COLLECTION_NAME", "movies-test")
+    monkeypatch.setattr(settings, "qdrant_url", "https://qdrant.example")
+    monkeypatch.setattr(settings, "qdrant_api_key_rw", "rw-test-key")
+    monkeypatch.setattr(settings, "qdrant_collection_name", "movies-test")
 
     captured: dict[str, object] = {}
 
@@ -66,8 +67,8 @@ def test_qdrant_vectorstore_batch_upsert(monkeypatch: MonkeyPatch) -> None:
                 title="Test Movie",
                 release_year=2024,
                 director="",
-                genre="",
-                cast="",
+                genre=[""],
+                cast=[""],
                 plot="",
             )
         ],

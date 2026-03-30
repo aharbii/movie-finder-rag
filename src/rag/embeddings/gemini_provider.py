@@ -50,7 +50,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     def embed(self, text: str) -> list[float]:
         """Generate an embedding for a single text using Gemini."""
         try:
-            response = self.client.models.embed(model=self.model, contents=[text])
+            response = self.client.models.embed_content(model=self.model, contents=[text])
             if not response.embeddings:
                 return []
 
@@ -62,7 +62,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts in a single batch call."""
         try:
-            response = self.client.models.embed(model=self.model, contents=texts)
+            response = self.client.models.embed_content(model=self.model, contents=texts)
             if not response.embeddings:
                 return []
 

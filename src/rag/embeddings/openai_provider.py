@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Any
 
 from openai import OpenAI
 from openai.types.create_embedding_response import Usage
@@ -64,12 +64,12 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             name=self.model, dimension=settings.embedding_dimension, cost_per_1k_tokens=0.0
         )
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str) -> list[float] | Any:
         """Generate an embedding for a single string of text."""
         try:
             response = self.client.embeddings.create(model=self.model, input=text)
             self._update_usage(response.usage)
-            return cast(list[float], response.data[0].embedding)
+            return response.data[0].embedding
         except Exception as e:
             self.logger.error(f"Error calling OpenAI API: {e}")
             return []
@@ -79,7 +79,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         try:
             response = self.client.embeddings.create(model=self.model, input=texts)
             self._update_usage(response.usage)
-            return [cast(list[float], data.embedding) for data in response.data]
+            return [data.embedding for data in response.data]
         except Exception as e:
             self.logger.error(f"Error calling OpenAI API for batch: {e}")
             return []
