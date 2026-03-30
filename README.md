@@ -33,31 +33,30 @@ for the `chain` package.
 ### Setup
 
 ```bash
-cp .env.example .env
-$EDITOR .env   # Fill in API keys
-
-make init
-make editor-up
+make init       # build dev + runtime images, create .env from template, install git hook
+make editor-up  # start the attached-container workspace
 ```
 
+After `make editor-up`, open `.env` and fill in the required API keys.
 `make editor-up` starts the long-lived workspace container used for VS Code attach/debug flows.
 The actual ingestion pipeline is still a one-shot command.
 
 ### Common Commands
 
 ```bash
-make init           # build dev + runtime images
+make init           # build dev + runtime images, create .env from template, install git hook
 make editor-up      # start the attached-container workspace
 make editor-down    # stop the local workspace container
-make shell          # shell into the workspace container
+make shell          # open zsh shell in the workspace container
 
-make lint           # ruff check
+make lint           # ruff check (report only)
+make fix            # ruff check --fix + ruff format (auto-apply)
 make format         # ruff format
-make typecheck      # mypy src (hardened DNA)
+make typecheck      # mypy (strict)
 make test           # pytest tests/
-make test-coverage  # pytest + coverage.xml + htmlcov
-make pre-commit     # repo hooks inside Docker
-make check          # lint + typecheck + test
+make test-coverage  # pytest + coverage.xml + htmlcov + JUnit report
+make pre-commit     # full hook suite (also enforced on git commit)
+make check          # lint + typecheck + test-coverage (CI gate)
 ```
 
 ### Ingestion

@@ -1,85 +1,119 @@
 // =============================================================================
 // movie-finder-rag — Jenkins declarative pipeline
 //
-// Triggers:
-//   • PR validation  — lint + typecheck + tests through the Docker Makefile
-//   • Branch build   — build ingestion image on main
-//   • Manual ingest  — trigger production-like ingestion run
+// Pipeline modes (Jenkins Multibranch Pipeline):
+//   PR build       — every pull request: Lint + Typecheck + Test (no image build)
+//   Main build     — push to main: Lint + Typecheck + Test (no image build)
+//   Manual ingest  — "Build with Parameters" with RUN_INGESTION=true:
+//                    Lint + Typecheck + Test + Ingest against production Qdrant
 //
-// Required Jenkins Credential IDs (Canonical setup in infrastructure#9):
-//   • qdrant-url           (Secret Text)
-//   • qdrant-api-key-rw    (Secret Text)
-//   • openai-api-key       (Secret Text)
-//   • kaggle-api-token     (Secret Text)
+// NOTE: This image is NOT pushed to ACR. The rag pipeline is an offline
+// one-shot ingestion tool run manually. Only backend and frontend images are
+// published to ACR.
+//
+// Required Jenkins Credential IDs (see docs/devops-setup.md):
+//   qdrant-url           (Secret Text)   — Ingest stage only
+//   qdrant-api-key-rw    (Secret Text)   — Ingest stage only
+//   openai-api-key       (Secret Text)   — Ingest stage only
+//   kaggle-api-token     (Secret Text)   — Ingest stage only
+//
+// Required Jenkins plugins: Docker Pipeline, JUnit, Cobertura, Credentials Binding
 // =============================================================================
 
 pipeline {
     agent any
 
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        timeout(time: 45, unit: 'MINUTES')
+        disableConcurrentBuilds(abortPrevious: true)
+    }
+
+    parameters {
+        booleanParam(
+            name: 'RUN_INGESTION',
+            defaultValue: false,
+            description: 'Run the offline ingestion pipeline against Qdrant Cloud (requires live credentials).'
+        )
+        string(
+            name: 'COLLECTION_NAME',
+            defaultValue: 'movies',
+            description: 'Qdrant collection name to write to. Defaults to "movies".'
+        )
+    }
+
     environment {
-        SERVICE_NAME = "movie-finder-rag"
-        DOCKER_BUILDKIT = "1"
+        SERVICE_NAME = 'movie-finder-rag'
+        DOCKER_BUILDKIT = '1'
+        // Isolate compose project per build so parallel CI runs don't collide.
+        COMPOSE_PROJECT_NAME = "movie-finder-rag-ci-${env.BUILD_NUMBER}"
     }
 
     stages {
-        stage('Lint + Typecheck') {
+
+        // ------------------------------------------------------------------ //
+        stage('Initialize') {
             steps {
-                script {
-                    echo "Starting code quality checks..."
-                    sh 'make lint'
-                    sh 'make typecheck'
+                // Build dev image. No .env needed — all vars have empty defaults
+                // in docker-compose.yml for lint/test stages.
+                sh 'make init'
+            }
+        }
+
+        // ------------------------------------------------------------------ //
+        stage('Lint + Typecheck') {
+            parallel {
+                stage('Lint') {
+                    steps { sh 'make lint' }
+                }
+                stage('Typecheck') {
+                    steps { sh 'make typecheck' }
                 }
             }
         }
 
+        // ------------------------------------------------------------------ //
         stage('Test') {
             steps {
-                script {
-                    echo "Starting unit tests and coverage..."
-                    sh 'make test-coverage'
-                }
+                sh 'make test-coverage'
             }
             post {
                 always {
-                    junit 'test-results.xml'
-                    cobertura coberturaReportFile: 'coverage.xml'
+                    junit allowEmptyResults: true, testResults: 'test-results.xml'
+                    cobertura coberturaReportFile: 'coverage.xml',
+                              onlyStable: false,
+                              failNoReports: false
                 }
             }
         }
 
-        stage('Build Image') {
-            when {
-                anyOf {
-                    branch 'main'
-                    buildingTag()
-                }
-            }
-            steps {
-                script {
-                    echo "Building production-like runtime image..."
-                    sh "docker build --target runtime -t ${SERVICE_NAME}:latest ."
-                }
-            }
-        }
-
+        // ------------------------------------------------------------------ //
         stage('Ingest') {
             when {
                 expression { params.RUN_INGESTION == true }
             }
             environment {
-                QDRANT_URL = credentials('qdrant-url')
+                QDRANT_URL        = credentials('qdrant-url')
                 QDRANT_API_KEY_RW = credentials('qdrant-api-key-rw')
-                QDRANT_COLLECTION_NAME = params.COLLECTION_NAME ?: 'movies'
-                OPENAI_API_KEY = credentials('openai-api-key')
-                KAGGLE_API_TOKEN = credentials('kaggle-api-token')
+                OPENAI_API_KEY    = credentials('openai-api-key')
+                KAGGLE_API_TOKEN  = credentials('kaggle-api-token')
             }
             steps {
                 script {
-                    echo "Running offline ingestion pipeline against Qdrant Cloud..."
+                    // env blocks only allow literals or credentials() calls.
+                    // Use script {} to evaluate the default-value expression.
+                    env.QDRANT_COLLECTION_NAME = params.COLLECTION_NAME ?: 'movies'
+                    echo "Target collection: ${env.QDRANT_COLLECTION_NAME}"
                     sh 'make ingest'
                 }
             }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'ingestion-outputs.env', allowEmptyArchive: true
+                }
+            }
         }
+
     }
 
     post {
@@ -88,7 +122,14 @@ pipeline {
             cleanWs()
         }
         failure {
-            echo "Pipeline failed on branch ${env.BRANCH_NAME} — check logs above."
+            echo "Pipeline failed on ${env.BRANCH_NAME ?: 'manual trigger'} — check logs above."
+        }
+        success {
+            script {
+                if (params.RUN_INGESTION) {
+                    echo "Ingestion into '${env.QDRANT_COLLECTION_NAME}' completed successfully."
+                }
+            }
         }
     }
 }
