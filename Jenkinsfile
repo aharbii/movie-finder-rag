@@ -17,7 +17,7 @@
 //   openai-api-key       (Secret Text)   — Ingest stage only
 //   kaggle-api-token     (Secret Text)   — Ingest stage only
 //
-// Required Jenkins plugins: Docker Pipeline, JUnit, Cobertura, Credentials Binding
+// Required Jenkins plugins: Docker Pipeline, JUnit, Coverage, Credentials Binding
 // =============================================================================
 
 pipeline {
@@ -80,9 +80,12 @@ pipeline {
             post {
                 always {
                     junit allowEmptyResults: true, testResults: 'test-results.xml'
-                    cobertura coberturaReportFile: 'coverage.xml',
-                              onlyStable: false,
-                              failNoReports: false
+                    recordCoverage(
+                        tools: [
+                            cobertura(pattern: 'coverage.xml')
+                        ],
+                        failOnError: false
+                    )
                 }
             }
         }
