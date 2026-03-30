@@ -31,7 +31,7 @@ class RAGConfig(BaseSettings):
     )
 
     # Ingestion Configuration
-    batch_size: int = 100
+    batch_size: int = 150
     embedding_provider: Literal["openai", "gemini"] = "openai"
 
     # Kaggle Configuration
