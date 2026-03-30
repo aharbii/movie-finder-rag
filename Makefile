@@ -5,12 +5,20 @@
 #   make help
 #   make <target>
 #
-# All supported developer commands execute through Docker Compose so local
-# linting, testing, formatting, typecheck, and pre-commit do not depend on a
-# host-managed Python environment. Qdrant is always external.
+# All developer commands execute through Docker Compose so linting, testing,
+# formatting, and pre-commit do not depend on a host-managed Python environment.
+# Qdrant is always external — no local Qdrant container is provided.
+#
+# Typical first-time flow:
+#   make init        # build images + create .env + install git hook
+#   make editor-up   # start container for VS Code attach
+#   make check       # lint + typecheck + tests with coverage
+#
+# When the editor container is already running, quality commands use
+# 'docker compose exec' instead of a new container — faster for interactive dev.
 # =============================================================================
 
-.PHONY: help setup init up down editor-up editor-down logs shell lint format \
+.PHONY: help setup init up down editor-up editor-down logs shell lint format fix \
 	typecheck test test-coverage detect-secrets pre-commit ingest check \
 	build run run-dev ci-down clean
 
@@ -19,11 +27,28 @@
 COMPOSE ?= docker compose
 SERVICE ?= rag
 INGEST_SERVICE ?= ingestion
-RAG_GIT_DIR_HOST := $(shell git rev-parse --git-dir)
+GIT_DIR_HOST := $(shell git rev-parse --git-dir)
+GIT_HOOKS_DIR := $(GIT_DIR_HOST)/hooks
+
+# Export so docker compose picks it up automatically (avoids per-command prefix).
+export RAG_GIT_DIR := $(GIT_DIR_HOST)
+
 SOURCE_PATHS := src tests scripts
 COVERAGE_XML ?= coverage.xml
 COVERAGE_HTML ?= htmlcov
 JUNIT_XML ?= test-results.xml
+
+# ---------------------------------------------------------------------------
+# exec when running, run --rm otherwise — avoids container startup overhead
+# for interactive development while remaining correct for CI.
+# ---------------------------------------------------------------------------
+define exec_or_run
+	@if $(COMPOSE) ps --services --status running 2>/dev/null | grep -qx "$(SERVICE)"; then \
+		$(COMPOSE) exec $(SERVICE) $(1); \
+	else \
+		$(COMPOSE) run --rm --no-deps $(SERVICE) $(1); \
+	fi
+endef
 
 help:
 	@echo ""
@@ -31,29 +56,30 @@ help:
 	@echo "===================================="
 	@echo ""
 	@echo "  Setup"
-	@echo "    setup          First-time dev setup (build + .env)"
+	@echo "    init           Build images, create .env from template, install git hook"
+	@echo "    setup          Alias for init"
 	@echo ""
 	@echo "  Editor"
 	@echo "    editor-up      Start the attached-container workspace in the background"
 	@echo "    editor-down    Stop the local workspace container"
-	@echo "    shell          Open a shell in the workspace container"
+	@echo "    shell          Open a zsh shell in the workspace container"
 	@echo ""
 	@echo "  Lifecycle"
-	@echo "    init           Build the dev and ingestion images"
 	@echo "    up             Alias for editor-up"
 	@echo "    down           Alias for editor-down"
 	@echo "    logs           Follow workspace container logs"
 	@echo "    ci-down        Full cleanup for CI: stop containers and remove volumes"
 	@echo ""
 	@echo "  Quality"
-	@echo "    lint           Run ruff check inside Docker"
-	@echo "    format         Run ruff format inside Docker"
-	@echo "    typecheck      Run mypy inside Docker"
-	@echo "    test           Run pytest inside Docker"
+	@echo "    lint           Run ruff check (report only)"
+	@echo "    format         Run ruff format (apply)"
+	@echo "    fix            Run ruff check --fix + ruff format (apply all auto-fixes)"
+	@echo "    typecheck      Run mypy"
+	@echo "    test           Run pytest"
 	@echo "    test-coverage  Run pytest with coverage + JUnit output"
-	@echo "    detect-secrets Run detect-secrets scan inside Docker"
-	@echo "    pre-commit     Run pre-commit hooks inside Docker"
-	@echo "    check          Convenience alias: lint + typecheck + test"
+	@echo "    detect-secrets Run detect-secrets scan"
+	@echo "    pre-commit     Run all pre-commit hooks"
+	@echo "    check          lint + typecheck + test-coverage"
 	@echo ""
 	@echo "  Pipeline"
 	@echo "    ingest         Run the one-shot ingestion pipeline against external Qdrant"
@@ -62,76 +88,78 @@ help:
 	@echo "    clean          Remove __pycache__, .pytest_cache, .mypy_cache, reports"
 	@echo ""
 	@echo "  Compatibility aliases"
-	@echo "    build          Alias for init"
-	@echo "    run            Alias for editor-up"
-	@echo "    run-dev        Alias for editor-up"
+	@echo "    build / run / run-dev  Alias for init / editor-up / editor-up"
 	@echo ""
-
-setup:
-	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo ">>> .env created from .env.example. Fill in your keys before running."; \
-	fi
-	$(MAKE) init
-	@echo ""
-	@echo ">>> Setup complete. Run 'make editor-up' to start developing."
 
 init:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) build $(SERVICE) $(INGEST_SERVICE)
+	@if [ ! -f .env ]; then cp .env.example .env && echo ">>> .env created from .env.example"; fi
+	$(COMPOSE) build $(SERVICE) $(INGEST_SERVICE)
+	@printf '#!/bin/sh\nexec make pre-commit\n' > $(GIT_HOOKS_DIR)/pre-commit
+	@chmod +x $(GIT_HOOKS_DIR)/pre-commit
+	@echo ">>> git pre-commit hook installed (calls 'make pre-commit' on every commit)"
+
+setup: init
 
 up: editor-up
 
 down: editor-down
 
 editor-up:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) up -d $(SERVICE)
+	@if ! $(COMPOSE) images -q $(SERVICE) 2>/dev/null | grep -q .; then \
+		echo ">>> Image not found — run 'make init' first"; exit 1; \
+	fi
+	$(COMPOSE) up -d $(SERVICE)
 
 editor-down:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) down --remove-orphans
+	$(COMPOSE) down --remove-orphans
 
 ci-down:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) down -v --remove-orphans
+	$(COMPOSE) down -v --remove-orphans
 
 logs:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) logs -f $(SERVICE)
+	$(COMPOSE) logs -f $(SERVICE)
 
 shell:
-	@if RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) ps --services --status running | grep -qx "$(SERVICE)"; then \
-		RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) exec $(SERVICE) sh; \
+	@if $(COMPOSE) ps --services --status running 2>/dev/null | grep -qx "$(SERVICE)"; then \
+		$(COMPOSE) exec $(SERVICE) zsh; \
 	else \
-		RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm $(SERVICE) sh; \
+		$(COMPOSE) run --rm $(SERVICE) zsh; \
 	fi
 
 lint:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm --no-deps $(SERVICE) ruff check $(SOURCE_PATHS)
+	$(call exec_or_run,ruff check $(SOURCE_PATHS))
 
 format:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm --no-deps $(SERVICE) ruff format $(SOURCE_PATHS)
+	$(call exec_or_run,ruff format $(SOURCE_PATHS))
+
+fix:
+	$(call exec_or_run,ruff check --fix $(SOURCE_PATHS))
+	$(call exec_or_run,ruff format $(SOURCE_PATHS))
 
 typecheck:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm --no-deps $(SERVICE) mypy $(SOURCE_PATHS)
+	$(call exec_or_run,mypy $(SOURCE_PATHS))
 
 test:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm --no-deps $(SERVICE) pytest tests/ -v --tb=short
+	$(call exec_or_run,pytest tests/ -v --tb=short)
 
 test-coverage:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm --no-deps $(SERVICE) pytest tests/ -v --tb=short \
+	$(call exec_or_run,pytest tests/ -v --tb=short \
 		--junitxml=$(JUNIT_XML) \
 		--cov=rag \
 		--cov-report=term-missing \
 		--cov-report=xml:$(COVERAGE_XML) \
-		--cov-report=html:$(COVERAGE_HTML)
+		--cov-report=html:$(COVERAGE_HTML))
 
 detect-secrets:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm --no-deps $(SERVICE) detect-secrets scan --baseline .secrets.baseline
+	$(call exec_or_run,detect-secrets scan --baseline .secrets.baseline) # pragma: allowlist secret
 
 pre-commit:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm --no-deps $(SERVICE) pre-commit run --all-files
+	$(call exec_or_run,pre-commit run --all-files)
 
 ingest:
-	RAG_GIT_DIR="$(RAG_GIT_DIR_HOST)" $(COMPOSE) run --rm $(INGEST_SERVICE)
+	$(COMPOSE) run --rm $(INGEST_SERVICE)
 
-check: lint typecheck test
+check: lint typecheck test-coverage
 
 clean:
 	@echo ">>> Removing Python cache files..."
@@ -146,7 +174,5 @@ clean:
 	@echo "Clean complete."
 
 build: init
-
 run: editor-up
-
 run-dev: editor-up
