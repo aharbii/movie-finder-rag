@@ -82,9 +82,16 @@ pipeline {
                     junit allowEmptyResults: true, testResults: 'test-results.xml'
                     recordCoverage(
                         tools: [
-                            cobertura(pattern: 'coverage.xml')
+                            [parser: 'COBERTURA', pattern: 'coverage.xml']
                         ],
+                        id: 'coverage',
+                        name: 'RAG Coverage',
+                        sourceCodeRetention: 'EVERY_BUILD',
                         failOnError: false
+                        qualityGates: [
+                            [threshold: 80.0, metric: 'LINE', baseline: 'PROJECT', unstable: true],
+                            [threshold: 80.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true]
+                        ]
                     )
                 }
             }
