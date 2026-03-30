@@ -87,7 +87,7 @@ pipeline {
                         id: 'coverage',
                         name: 'RAG Coverage',
                         sourceCodeRetention: 'EVERY_BUILD',
-                        failOnError: false
+                        failOnError: false,
                         qualityGates: [
                             [threshold: 80.0, metric: 'LINE', baseline: 'PROJECT', unstable: true],
                             [threshold: 80.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true]
