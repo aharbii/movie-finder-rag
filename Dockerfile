@@ -22,8 +22,12 @@ FROM uv-base AS dev
 WORKDIR /workspace
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends git zsh make curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure a minimal shell prompt without internet downloads.
+RUN printf 'export PS1="[rag] %n@%m:%~%% "\nalias ls="ls --color=auto"\nalias ll="ls -alF"\n' \
+    > /root/.zshrc
 
 RUN python -m venv /opt/venv
 
