@@ -1,71 +1,55 @@
 # =============================================================================
-# rag_ingestion — docker-compose for local development and CI
+# movie-finder-rag — Docker-only local development stack
 #
 # Services:
-#   qdrant     — local Qdrant instance (always started)
-#   ingestion  — batch ingestion job (profile "run" — manual trigger only)
+#   rag        Attached-container workspace for lint/test/debug/editor flows
+#   ingestion  One-shot runtime image for the manual ingestion entrypoint
 #
-# Usage:
-#   # Start Qdrant for local exploration / testing:
-#   docker compose up qdrant
-#
-#   # Run the full ingestion pipeline against local Qdrant:
-#   docker compose --profile run up --build ingestion
-#
-#   # Run against Qdrant Cloud (set QDRANT_ENDPOINT in .env):
-#   docker compose run ingestion
-#
-# Environment:
-#   Copy .env.example → .env and fill in values before running.
+# Qdrant is external-only. No local Qdrant container is supported here.
 # =============================================================================
 
-services:
+name: movie-finder-rag-local
 
-  # ---------------------------------------------------------------------------
-  # Qdrant — local vector store for development / integration tests
-  # Production uses Qdrant Cloud; configure via QDRANT_ENDPOINT in .env.
-  # ---------------------------------------------------------------------------
-  qdrant:
-    image: qdrant/qdrant:v1.13.0
-    container_name: rag-qdrant-dev
-    ports:
-      - "6333:6333"
-      - "6334:6334"   # gRPC
-    volumes:
-      - qdrant_data:/qdrant/storage
+services:
+  rag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    image: movie-finder-rag:dev
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
     environment:
-      QDRANT__SERVICE__GRPC_PORT: "6334"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:6333/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+      GIT_DIR: /workspace/.gitdir
+      GIT_WORK_TREE: /workspace
+      QDRANT_URL: ${QDRANT_URL:-}
+      QDRANT_API_KEY_RW: ${QDRANT_API_KEY_RW:-}
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-movies}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
+    volumes:
+      - .:/workspace
+      - ${RAG_GIT_DIR:-.git}:/workspace/.gitdir
+      - uv_cache:/root/.cache/uv
+      - pre_commit_cache:/root/.cache/pre-commit
+    stdin_open: true
+    tty: true
     restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # Ingestion — one-shot batch job, manual trigger only (profile: run)
-  # Not started by default; requires --profile run flag.
-  # ---------------------------------------------------------------------------
   ingestion:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rag-ingestion-job
-    env_file:
-      - .env
+      target: runtime
+    image: movie-finder-rag:runtime
     environment:
-      # Override Qdrant endpoint to use the local container when developing
-      # Remove this override to use QDRANT_ENDPOINT from .env (Qdrant Cloud)
-      QDRANT_ENDPOINT: "http://qdrant:6333"
-      QDRANT_API_KEY: ""
-    depends_on:
-      qdrant:
-        condition: service_healthy
-    profiles:
-      - run
+      QDRANT_URL: ${QDRANT_URL:-}
+      QDRANT_API_KEY_RW: ${QDRANT_API_KEY_RW:-}
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-movies}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
     restart: "no"
 
 volumes:
-  qdrant_data:
-    name: rag-ingestion-qdrant-data
+  uv_cache:
+  pre_commit_cache:

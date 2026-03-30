@@ -1,32 +1,31 @@
 # GitHub Copilot — movie-finder-rag
 
-Offline embedding ingestion pipeline for Movie Finder. Reads raw movie data, generates
-OpenAI embeddings, and upserts vectors into Qdrant Cloud. Runs as a standalone script —
-not part of the live request path.
+Offline embedding ingestion pipeline for Movie Finder. Reads Kaggle data, generates OpenAI
+embeddings, and upserts vectors into Qdrant Cloud. This repo uses a Docker-only local-development
+contract and is not part of the live request path.
 
-Parent project: `aharbii/movie-finder` — all issues created there first, then linked here.
+Parent project: `aharbii/movie-finder` — all cross-repo tracker issues start there.
 
 ---
 
 ## Package role
 
-- Reads movie dataset (CSV / JSON source)
-- Chunks and preprocesses text
-- Calls OpenAI `text-embedding-3-large` (3072-dim) to generate embeddings
-- Upserts vectors + payload into a Qdrant Cloud collection
-- **Standalone `uv` project** — has its own `.venv` (not a workspace member)
+- Downloads the Wikipedia Movie Plots dataset via `kagglehub`
+- Generates `text-embedding-3-large` vectors
+- Writes to Qdrant Cloud with the write-capable API key used only by this repo
+- Exposes repo-local `make ...` targets backed by Docker Compose
 
-Qdrant is always external (Qdrant Cloud) — no local Qdrant container ever.
+Qdrant is always external. Do not reintroduce a local Qdrant container or `localhost` endpoint.
 
 ---
 
 ## Python standards
 
-- Python 3.13, standalone `uv` project (`rag_ingestion/.venv`), `ruff` + `mypy --strict`, line length **100**
-- Type annotations required on all public functions
-- Async all the way — no blocking I/O in async context
-- Docstrings on all public classes and functions (Google style)
-- Tests: `pytest` with `pytest-mock`. No real OpenAI or Qdrant calls — mock at HTTP boundary.
+- Python 3.13
+- Docker-only local workflow; use the attached `rag` container for editor/debug flows
+- `ruff` + `mypy --strict`, line length **100**
+- Type annotations required on public functions
+- Tests must stub OpenAI, Qdrant, and Kaggle interactions
 
 ---
 
@@ -39,17 +38,26 @@ Qdrant is always external (Qdrant Cloud) — no local Qdrant container ever.
 
 ---
 
-## Pre-commit hooks
+## Developer workflow
 
 ```bash
-# From rag_ingestion/ directory (standalone uv project)
-uv run pre-commit install
-uv run pre-commit run --all-files
+make init
+make up
+make lint
+make typecheck
+make test
+make test-coverage
+make pre-commit
+make ingest
 ```
 
-Hooks: `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-merge-conflict`,
-`detect-private-key`, `detect-secrets`, `pretty-format-json`, `sort-simple-yaml`,
-`mypy --strict`, `ruff-check --fix`, `ruff-format`.
+Canonical env vars:
+
+- `QDRANT_URL`
+- `QDRANT_API_KEY_RW`
+- `QDRANT_COLLECTION_NAME`
+- `OPENAI_API_KEY`
+- `KAGGLE_API_TOKEN`
 
 ---
 
@@ -57,7 +65,8 @@ Hooks: `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-merge-co
 
 | # | Title |
 |---|---|
-| #14 | Shared production Qdrant cluster across all environments |
+| #2 | Shared production Qdrant cluster across all environments |
+| #13 | Standardize Docker-only local development workflow and repo tooling |
 | #19 | No batch embedding — single calls per document |
 
 ---
@@ -87,6 +96,6 @@ Hooks: `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-merge-co
 2. Branch: `feature/`, `fix/`, `chore/` (kebab-case) from `main` unless stacking is explicitly requested
 3. ADR if embedding model, vector dimensions, or Qdrant schema changes
 4. `.env.example` updated in rag_ingestion + backend + root
-5. `Dockerfile` updated if new deps or env vars
-6. `backend/chain/` assessed — embedding model change affects search quality
+5. `Dockerfile`, `docker-compose.yml`, and `Makefile` updated if the local contract changes
+6. `backend/chain/` assessed — embedding model or collection changes affect search quality
 7. PlantUML diagrams updated for pipeline changes

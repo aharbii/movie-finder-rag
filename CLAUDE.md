@@ -13,6 +13,7 @@ and upserts vectors into Qdrant Cloud. Runs as a one-shot script, not part of th
 - **Data source:** Kaggle dataset via `kagglehub`
 - **Embedding model:** OpenAI `text-embedding-3-large` (3072-dim)
 - **Vector store:** Qdrant Cloud — always external, never a local container
+- **Local dev contract:** Docker-only via repo-local `make ...` targets
 - **Intentionally outside** the `uv` workspace (separate lifecycle from `backend/`)
 - **Jenkins trigger:** Manual (`RUN_INGESTION=true` parameter) or on `main`/tags
 - **Output artifact:** `ingestion-outputs.env` — archived by Jenkins, used by `chain/` team to verify collection name and dimension
@@ -39,7 +40,7 @@ and upserts vectors into Qdrant Cloud. Runs as a one-shot script, not part of th
 
 | Layer | Stack |
 |---|---|
-| Language | Python 3.13 (standalone `uv` project, not workspace member) |
+| Language | Python 3.13 (standalone repo, Docker-only local workflow) |
 | Data | `kagglehub`, `pandas`, `pydantic` |
 | Embeddings | `openai` SDK — `text-embedding-3-large`, 3072-dim |
 | Vector store | `qdrant-client` (Qdrant Cloud only) |
@@ -51,12 +52,9 @@ and upserts vectors into Qdrant Cloud. Runs as a one-shot script, not part of th
 ### Environment variables (`.env.example`)
 
 ```
-QDRANT_ENDPOINT, QDRANT_API_KEY, QDRANT_COLLECTION
+QDRANT_URL, QDRANT_API_KEY_RW, QDRANT_COLLECTION_NAME
 OPENAI_API_KEY
-EMBEDDING_MODEL=text-embedding-3-large
-EMBEDDING_DIMENSION=3072
-KAGGLE_USERNAME, KAGGLE_KEY
-VECTOR_STORE=qdrant            # or chromadb (experimental)
+KAGGLE_API_TOKEN
 ```
 
 ---
@@ -89,8 +87,7 @@ VECTOR_STORE=qdrant            # or chromadb (experimental)
 `backend/rag_ingestion/.pre-commit-config.yaml` — install and run from this directory.
 
 ```bash
-uv run pre-commit install    # once per clone
-uv run pre-commit run --all-files
+make pre-commit
 ```
 
 | Hook | Notes |
@@ -110,12 +107,13 @@ uv run pre-commit run --all-files
 ## VSCode setup
 
 `backend/rag_ingestion/.vscode/` is committed with a full workspace configuration:
-- `settings.json` — Python interpreter (`rag_ingestion/.venv`, standalone project), Ruff, mypy strict, pytest
-- `extensions.json` — Python, debugpy, Ruff, mypy, TOML, GitLens
-- `launch.json` — ingestion pipeline runner + pytest all / current file
-- `tasks.json` — lint, format, test, test with coverage, pre-commit, ingestion dry run
+- `settings.json` — attached-container interpreter (`/opt/venv/bin/python`), Ruff, mypy strict, pytest
+- `extensions.json` — Remote Containers, Python, debugpy, Ruff, mypy, Coverage Gutters, Makefile Tools
+- `launch.json` — ingestion pipeline runner + pytest profiles for the attached `rag` container
+- `tasks.json` — `make ...` targets for init/up/down/logs/shell/lint/format/typecheck/test/coverage/pre-commit/ingest
 
-**Interpreter:** Run `uv sync` from `backend/rag_ingestion/` — creates its own `.venv/` (standalone)
+**Interpreter:** Run `make up` from `backend/rag_ingestion/`, then attach VS Code to the `rag`
+container and use `/opt/venv/bin/python`
 
 ---
 
