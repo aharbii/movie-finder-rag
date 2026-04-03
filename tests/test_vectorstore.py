@@ -108,7 +108,9 @@ def test_qdrant_upsert_creates_collection(
         mock_client.return_value.create_collection.assert_called_once()
 
 
-def test_qdrant_search(model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_qdrant_search(
+    model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "qdrant_url", "http://test")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
 
