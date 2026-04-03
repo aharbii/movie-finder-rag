@@ -12,6 +12,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - `Makefile` — Docker-only repo contract for `init`, `up`, `down`, `logs`, `shell`, `lint`,
   `format`, `typecheck`, `test`, `test-coverage`, `pre-commit`, and `ingest`
+- Comprehensive test suite for `movie-finder-rag` module, increasing coverage from 31% to 96%:
+    - `tests/test_config.py`: Configuration and embedding dimension logic tests.
+    - `tests/test_dataset.py`: Dataset download and filesystem operation tests.
+    - `tests/test_embeddings.py`: OpenAI and Gemini provider tests with usage tracking.
+    - `tests/test_ingestion.py`: CSV loading and ingestion pipeline orchestration tests.
+    - `tests/test_main.py`: Entry point and provider resolution tests.
+    - `tests/test_vectorstore.py`: ChromaDB and Qdrant vector store operation tests.
 
 ### Changed
 
@@ -21,6 +28,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `QDRANT_COLLECTION_NAME` contract, with temporary legacy fallback in code
 - Tests now use stubbed Qdrant clients instead of real external API calls so CI can run without
   live Qdrant/OpenAI credentials
+- `src/rag/ingestion/csv_loader.py`: Improved parsing of `genre` and `cast` fields into lists.
+
+### Fixed
+
+- Bug in `csv_loader.py` where `genre` and `cast` were being passed as strings instead of lists to the `Movie` model.
 
 ### Removed
 
@@ -34,11 +46,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - Dataset download via `kagglehub` — Wikipedia Movie Plots (Kaggle dataset)
 - `EmbeddingProvider` ABC with two implementations:
-  - `OpenAIEmbeddingProvider` — `text-embedding-3-large` (3072 dimensions)
-  - `GeminiEmbeddingProvider` — Google Gemini embeddings
+    - `OpenAIEmbeddingProvider` — `text-embedding-3-large` (3072 dimensions)
+    - `GeminiEmbeddingProvider` — Google Gemini embeddings
 - `VectorStore` ABC with two implementations:
-  - `QdrantVectorStore` — Qdrant Cloud (production)
-  - `ChromaDBVectorStore` — local ChromaDB (development / backup)
+    - `QdrantVectorStore` — Qdrant Cloud (production)
+    - `ChromaDBVectorStore` — local ChromaDB (development / backup)
 - `Movie` Pydantic model for typed CSV row representation
 - CSV loader (`csv_loader.py`) — pandas-based, handles deduplication
 - Ingestion pipeline (`pipeline.py`) — orchestrates load → embed → upsert

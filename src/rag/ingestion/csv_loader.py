@@ -48,8 +48,8 @@ def load_movies(
                 title=str(row["Title"]),
                 release_year=int(row["Release Year"]),
                 director=str(row["Director"]),
-                genre=str(row["Genre"]),
-                cast=str(row["Cast"]),
+                genre=[g.strip() for g in str(row["Genre"]).split(",") if g.strip()],
+                cast=[c.strip() for c in str(row["Cast"]).split(",") if c.strip()],
                 plot=str(row["Plot"]),
             )
             movies.append(movie)
