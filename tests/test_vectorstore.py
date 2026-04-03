@@ -10,7 +10,7 @@ from rag.vectorstore.qdrant_vectorstore import QdrantVectorStore, QdrantVectorSt
 
 
 @pytest.fixture
-def sample_movie():
+def sample_movie() -> Movie:
     return Movie(
         id=1,
         title="Test Movie",
@@ -23,11 +23,11 @@ def sample_movie():
 
 
 @pytest.fixture
-def model_metadata():
+def model_metadata() -> EmbeddingModelMetadata:
     return EmbeddingModelMetadata(name="test-model", dimension=3)
 
 
-def test_chromadb_upsert(sample_movie, model_metadata):
+def test_chromadb_upsert(sample_movie: Movie, model_metadata: EmbeddingModelMetadata) -> None:
     with patch("chromadb.Client") as mock_client:
         mock_collection = MagicMock()
         mock_client.return_value.get_or_create_collection.return_value = mock_collection
@@ -38,7 +38,7 @@ def test_chromadb_upsert(sample_movie, model_metadata):
         mock_collection.add.assert_called_once()
 
 
-def test_chromadb_upsert_batch(sample_movie, model_metadata):
+def test_chromadb_upsert_batch(sample_movie: Movie, model_metadata: EmbeddingModelMetadata) -> None:
     with patch("chromadb.Client") as mock_client:
         mock_collection = MagicMock()
         mock_client.return_value.get_or_create_collection.return_value = mock_collection
@@ -49,7 +49,7 @@ def test_chromadb_upsert_batch(sample_movie, model_metadata):
         mock_collection.add.assert_called_once()
 
 
-def test_chromadb_search(model_metadata):
+def test_chromadb_search(model_metadata: EmbeddingModelMetadata) -> None:
     with patch("chromadb.Client") as mock_client:
         mock_collection = MagicMock()
         mock_collection.query.return_value = {
@@ -76,13 +76,15 @@ def test_chromadb_search(model_metadata):
         assert results[0].title == "T"
 
 
-def test_qdrant_validate_env_error(monkeypatch):
+def test_qdrant_validate_env_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "")
     with pytest.raises(QdrantVectorStoreError, match="QDRANT_API_KEY_RW is not defined"):
         QdrantVectorStore()
 
 
-def test_qdrant_upsert(sample_movie, model_metadata, monkeypatch):
+def test_qdrant_upsert(
+    sample_movie: Movie, model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "qdrant_url", "http://test")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
 
@@ -93,7 +95,9 @@ def test_qdrant_upsert(sample_movie, model_metadata, monkeypatch):
         mock_client.return_value.upsert.assert_called_once()
 
 
-def test_qdrant_upsert_creates_collection(sample_movie, model_metadata, monkeypatch):
+def test_qdrant_upsert_creates_collection(
+    sample_movie: Movie, model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "qdrant_url", "http://test")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
 
@@ -104,7 +108,7 @@ def test_qdrant_upsert_creates_collection(sample_movie, model_metadata, monkeypa
         mock_client.return_value.create_collection.assert_called_once()
 
 
-def test_qdrant_search(model_metadata, monkeypatch):
+def test_qdrant_search(model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "qdrant_url", "http://test")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
 

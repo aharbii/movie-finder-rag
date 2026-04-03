@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -8,7 +9,7 @@ from rag.ingestion.pipeline import ingest_csv
 from rag.models.movie import Movie
 
 
-def test_load_movies_success(tmp_path) -> None:
+def test_load_movies_success(tmp_path: Path) -> None:
     """Test successful movie loading and filtering."""
     csv_file = tmp_path / "movies.csv"
     df = pd.DataFrame(
@@ -32,7 +33,7 @@ def test_load_movies_success(tmp_path) -> None:
     assert isinstance(movies[0].genre, list)
 
 
-def test_load_movies_malformed_row(tmp_path) -> None:
+def test_load_movies_malformed_row(tmp_path: Path) -> None:
     """Test skipping of malformed rows during movie loading."""
     csv_file = tmp_path / "malformed.csv"
     df = pd.DataFrame(
