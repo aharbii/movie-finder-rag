@@ -18,9 +18,11 @@
 # 'docker compose exec' instead of a new container — faster for interactive dev.
 # =============================================================================
 
-.PHONY: help setup init up down editor-up editor-down logs shell lint format fix \
-	typecheck test test-coverage detect-secrets pre-commit ingest check \
-	build run run-dev ci-down clean backup retrieve
+.PHONY: help init build setup clean \
+	editor-up editor-down ci-down shell logs up down  run run-dev \
+	lint format fix typecheck test test-coverage pre-commit detect-secrets check \
+	backup retrieve
+
 
 .DEFAULT_GOAL := help
 
@@ -33,7 +35,7 @@ GIT_HOOKS_DIR := $(GIT_DIR_HOST)/hooks
 # Export so docker compose picks it up automatically (avoids per-command prefix).
 export RAG_GIT_DIR := $(GIT_DIR_HOST)
 
-SOURCE_PATHS := src tests scripts
+SOURCE_PATHS := .
 COVERAGE_XML ?= coverage.xml
 COVERAGE_HTML ?= htmlcov
 JUNIT_XML ?= test-results.xml
@@ -57,7 +59,6 @@ help:
 	@echo ""
 	@echo "  Setup"
 	@echo "    init           Build images, create .env from template, install git hook"
-	@echo "    setup          Alias for init"
 	@echo ""
 	@echo "  Editor"
 	@echo "    editor-up      Start the attached-container workspace in the background"
@@ -81,14 +82,16 @@ help:
 	@echo "    pre-commit     Run all pre-commit hooks"
 	@echo "    check          lint + typecheck + test-coverage"
 	@echo ""
-	@echo "  Pipeline"
-	@echo "    ingest         Run the one-shot ingestion pipeline against external Qdrant"
-	@echo ""
 	@echo "  Maintenance"
 	@echo "    clean          Remove __pycache__, .pytest_cache, .mypy_cache, reports"
 	@echo ""
 	@echo "  Compatibility aliases"
-	@echo "    build / run / run-dev  Alias for init / editor-up / editor-up"
+	@echo "    build          Alias for init"
+	@echo "    run / run-dev  Alias for editor-up"
+	@echo "    setup          Alias for init"
+	@echo ""
+	@echo "  Pipeline"
+	@echo "    ingest         Run the one-shot ingestion pipeline against external Qdrant"
 	@echo ""
 	@echo "  Apps"
 	@echo "    backup         Creates a Backup for the Qdrant vector store in a local ChromaDB"
@@ -103,16 +106,19 @@ init:
 	@echo ">>> git pre-commit hook installed (calls 'make pre-commit' on every commit)"
 
 setup: init
-
-up: editor-up
-
-down: editor-down
+build: init
 
 editor-up:
 	$(COMPOSE) up -d $(SERVICE)
 
+up: editor-up
+run: editor-up
+run-dev: editor-up
+
 editor-down:
 	$(COMPOSE) down --remove-orphans
+
+down: editor-down
 
 ci-down:
 	$(COMPOSE) down -v --remove-orphans
@@ -157,9 +163,6 @@ detect-secrets:
 pre-commit:
 	$(call exec_or_run,pre-commit run --all-files)
 
-ingest:
-	$(COMPOSE) run --rm $(INGEST_SERVICE)
-
 check: lint typecheck test-coverage
 
 clean:
@@ -174,9 +177,8 @@ clean:
 	find . -type d -name "htmlcov" -not -path "./.git/*" -exec rm -rf {} + 2>/dev/null || true
 	@echo "Clean complete."
 
-build: init
-run: editor-up
-run-dev: editor-up
+ingest:
+	$(COMPOSE) run --rm $(INGEST_SERVICE)
 
 backup:
 	$(call exec_or_run,python scripts/backup_vectorstore.py)

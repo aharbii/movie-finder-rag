@@ -25,6 +25,8 @@ htmlcov/
 !.vscode/extensions.json
 !.vscode/mcp.json
 .idea/
+.claude/*
+!.claude/commands/
 
 # Secrets — never commit
 .env

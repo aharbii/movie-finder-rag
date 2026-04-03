@@ -54,8 +54,6 @@ pipeline {
         // ------------------------------------------------------------------ //
         stage('Initialize') {
             steps {
-                // Build dev image. No .env needed — all vars have empty defaults
-                // in docker-compose.yml for lint/test stages.
                 sh 'make init'
             }
         }

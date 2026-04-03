@@ -34,23 +34,17 @@ repos:
           - .secrets.baseline
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.0
+    rev: v1.20.0
     hooks:
       - id: mypy
         language_version: python3.13
         additional_dependencies:
-          - pydantic
-          - pydantic-settings
-        args:
-          - --check-untyped-defs
-          - --disallow-untyped-defs
-          - --ignore-missing-imports
-          - --warn-return-any
-          - --warn-unused-ignores
-          - --show-error-codes
+          - pydantic==2.12.5
+          - pydantic-settings==2.13.1
+        args: [--config-file=pyproject.toml]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.13
+    rev: v0.15.9
     hooks:
       - id: ruff-check
         args: [--fix]
