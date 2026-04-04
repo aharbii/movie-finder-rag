@@ -37,7 +37,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --group dev --active --no-install-project --no-install-workspace
+    uv sync --all-groups --active --no-install-project --no-install-workspace
 
 CMD ["sleep", "infinity"]
 

@@ -126,6 +126,7 @@ pipeline {
 
     post {
         always {
+            sh 'make clean || true'
             sh 'make ci-down || true'
             cleanWs()
         }

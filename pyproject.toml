@@ -20,20 +20,20 @@ dependencies = [
     "kagglehub>=1.0.0",
     "openai>=2.29.0",
     "pandas>=3.0.1",
-    "pydantic==2.12.5",
-    "pydantic-settings==2.13.1",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
     "qdrant-client>=1.17.1",
     "tqdm>=4.66.0",
 ]
 
 [dependency-groups]
-lint = ["ruff==0.15.9", "mypy==1.20.0"]
+lint = ["ruff>=0.15.9", "mypy>=1.20.0"]
 test = ["pytest>=8.3.0", "pytest-cov>=6.0.0"]
 dev = [
     { include-group = "lint" },
     { include-group = "test" },
-    "pre-commit==4.5.1",
-    "detect-secrets==1.5.0",
+    "pre-commit>=4.5.1",
+    "detect-secrets>=1.5.0",
 ]
 
 [tool.uv]
@@ -83,8 +83,8 @@ testpaths = ["tests"]
 addopts = ["-v", "--tb=short"]
 
 [tool.coverage.run]
-source = ["src"]
-omit = ["tests/*", "*/py.typed"]
+source = ["."]
+omit = ["tests/*", "scripts/*", "*/py.typed"]
 
 [tool.coverage.report]
 show_missing = true

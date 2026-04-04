@@ -39,8 +39,8 @@ repos:
       - id: mypy
         language_version: python3.13
         additional_dependencies:
-          - pydantic==2.12.5
-          - pydantic-settings==2.13.1
+          - pydantic
+          - pydantic-settings
           - pytest
         args: [--config-file=pyproject.toml]
 
