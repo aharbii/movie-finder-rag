@@ -42,6 +42,7 @@ git checkout -b [type]/[kebab-case-title]
 ## Step 5 — Implement
 
 RAG ingestion-specific patterns:
+
 - Strategy pattern for embedding providers — new provider = new class implementing the interface; no `if provider == "openai"` branching
 - Qdrant Cloud is always external — no local Qdrant container
 - Embedding model: OpenAI `text-embedding-3-large` (3072-dim)
@@ -49,6 +50,7 @@ RAG ingestion-specific patterns:
 - Batch embedding is preferred (see issue #19)
 
 General backend standards:
+
 - Type annotations required, `mypy --strict`
 - Line length ≤ 100 chars
 - No bare `except:`, no `print()`, async all the way

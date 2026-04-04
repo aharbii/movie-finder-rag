@@ -88,13 +88,13 @@ The interpreter path inside the container is `/opt/venv/bin/python`.
 
 Canonical variables for this repo (DNA aligned with `infrastructure#9`):
 
-| Variable | Required | Description |
-|---|---|---|
-| `QDRANT_URL` | Yes | Qdrant Cloud cluster URL |
-| `QDRANT_API_KEY_RW` | Yes | Write-capable Qdrant API key |
-| `QDRANT_COLLECTION_NAME` | Yes | Shared collection name consumed by `chain` |
-| `OPENAI_API_KEY` | Yes | OpenAI API key for embeddings |
-| `KAGGLE_API_TOKEN` | Yes | Standalone token prefixed with `KGAT_` |
+| Variable                 | Required | Description                                |
+| ------------------------ | -------- | ------------------------------------------ |
+| `QDRANT_URL`             | Yes      | Qdrant Cloud cluster URL                   |
+| `QDRANT_API_KEY_RW`      | Yes      | Write-capable Qdrant API key               |
+| `QDRANT_COLLECTION_NAME` | Yes      | Shared collection name consumed by `chain` |
+| `OPENAI_API_KEY`         | Yes      | OpenAI API key for embeddings              |
+| `KAGGLE_API_TOKEN`       | Yes      | Standalone token prefixed with `KGAT_`     |
 
 ---
 
@@ -103,12 +103,12 @@ Canonical variables for this repo (DNA aligned with `infrastructure#9`):
 See `Jenkinsfile` for the full pipeline. The current stages line up with the repo-local
 developer contract:
 
-| Stage | Command / trigger | Notes |
-|---|---|---|
-| Lint + Typecheck | `make lint` + `make typecheck` | PRs, `main`, tags |
-| Test | `make test-coverage` | PRs, `main`, tags |
-| Build Image | `docker build --target runtime ...` | `main` and tags |
-| Ingest | Manual `RUN_INGESTION=true` | Triggered via Jenkins parameters |
+| Stage            | Command / trigger                   | Notes                            |
+| ---------------- | ----------------------------------- | -------------------------------- |
+| Lint + Typecheck | `make lint` + `make typecheck`      | PRs, `main`, tags                |
+| Test             | `make test-coverage`                | PRs, `main`, tags                |
+| Build Image      | `docker build --target runtime ...` | `main` and tags                  |
+| Ingest           | Manual `RUN_INGESTION=true`         | Triggered via Jenkins parameters |
 
 ---
 

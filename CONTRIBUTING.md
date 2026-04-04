@@ -118,6 +118,7 @@ This project follows the **Strategy Pattern** for embedding providers. To add a 
 4.  **Configuration**: If the provider requires new secrets, update `src/rag/config.py` (Pydantic `RAGConfig`), `.env.example`, and the documentation.
 
 Example:
+
 ```python
 from rag.embeddings.base import EmbeddingProvider, EmbeddingModel, EmbeddingModelUsage
 
@@ -168,12 +169,12 @@ Follow these rules:
 The Jenkins pipeline executes through the Docker Makefile to ensure environment parity between
 local and CI runs.
 
-| Stage | Command / trigger | Notes |
-|---|---|---|
-| Lint + Typecheck | `make lint` + `make typecheck` | PRs, `main`, tags |
-| Test | `make test-coverage` | PRs, `main`, tags |
-| Build Image | `docker build --target runtime ...` | `main` and tags |
-| Ingest | Manual `RUN_INGESTION=true` | Triggered via Jenkins parameters |
+| Stage            | Command / trigger                   | Notes                            |
+| ---------------- | ----------------------------------- | -------------------------------- |
+| Lint + Typecheck | `make lint` + `make typecheck`      | PRs, `main`, tags                |
+| Test             | `make test-coverage`                | PRs, `main`, tags                |
+| Build Image      | `docker build --target runtime ...` | `main` and tags                  |
+| Ingest           | Manual `RUN_INGESTION=true`         | Triggered via Jenkins parameters |
 
 ---
 

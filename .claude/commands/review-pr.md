@@ -20,11 +20,13 @@ gh pr diff $ARGUMENTS --repo aharbii/movie-finder-rag
 ## Blocking findings
 
 **RAG-specific patterns:**
+
 - Strategy pattern violated for embedding providers (if/else on provider name in core logic)
 - Local Qdrant container referenced (must always be Qdrant Cloud external)
 - Embedding dimensions hardcoded or mismatched (must match configured model: 3072 for text-embedding-3-large)
 
 **Python standards:**
+
 - Missing type annotations, bare `except:`, `print()`, `type: ignore` without comment
 - Line > 100 chars, no tests for new logic
 

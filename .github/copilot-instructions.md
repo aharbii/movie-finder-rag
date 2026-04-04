@@ -31,10 +31,10 @@ Qdrant is always external. Do not reintroduce a local Qdrant container or `local
 
 ## Design patterns — follow these
 
-| Pattern | Rule |
-|---|---|
-| **Strategy** | New embedding provider = new class implementing the provider interface. No `if provider == "openai"` in pipeline logic. |
-| **Configuration object** | All env vars loaded once in `config.py` via Pydantic `BaseSettings`. |
+| Pattern                  | Rule                                                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Strategy**             | New embedding provider = new class implementing the provider interface. No `if provider == "openai"` in pipeline logic. |
+| **Configuration object** | All env vars loaded once in `config.py` via Pydantic `BaseSettings`.                                                    |
 
 ---
 
@@ -63,11 +63,11 @@ Canonical env vars:
 
 ## Known issues most relevant to this package
 
-| # | Title |
-|---|---|
-| #2 | Shared production Qdrant cluster across all environments |
+| #   | Title                                                               |
+| --- | ------------------------------------------------------------------- |
+| #2  | Shared production Qdrant cluster across all environments            |
 | #13 | Standardize Docker-only local development workflow and repo tooling |
-| #19 | No batch embedding — single calls per document |
+| #19 | No batch embedding — single calls per document                      |
 
 ---
 
