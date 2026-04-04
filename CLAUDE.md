@@ -24,30 +24,30 @@ and upserts vectors into Qdrant Cloud. Runs as a one-shot script, not part of th
 
 ### Submodule map
 
-| Path | GitHub repo | Role |
-|---|---|---|
-| `.` (root) | `aharbii/movie-finder` | Parent — all cross-repo issues |
-| `backend/` | `aharbii/movie-finder-backend` | FastAPI + uv workspace root |
-| `backend/app/` | (nested in backend) | FastAPI application layer |
-| `backend/chain/` | `aharbii/movie-finder-chain` | LangGraph 8-node AI pipeline |
-| `backend/imdbapi/` | `aharbii/imdbapi-client` | Async IMDb REST client |
-| `backend/rag_ingestion/` | `aharbii/movie-finder-rag` | **← you are here** |
-| `frontend/` | `aharbii/movie-finder-frontend` | Angular 21 SPA |
-| `docs/` | `aharbii/movie-finder-docs` | MkDocs documentation |
-| `infrastructure/` | `aharbii/movie-finder-infrastructure` | IaC / Azure provisioning |
+| Path                     | GitHub repo                           | Role                           |
+| ------------------------ | ------------------------------------- | ------------------------------ |
+| `.` (root)               | `aharbii/movie-finder`                | Parent — all cross-repo issues |
+| `backend/`               | `aharbii/movie-finder-backend`        | FastAPI + uv workspace root    |
+| `backend/app/`           | (nested in backend)                   | FastAPI application layer      |
+| `backend/chain/`         | `aharbii/movie-finder-chain`          | LangGraph 8-node AI pipeline   |
+| `backend/chain/imdbapi/` | `aharbii/imdbapi-client`              | Async IMDb REST client         |
+| `backend/rag_ingestion/` | `aharbii/movie-finder-rag`            | **← you are here**             |
+| `frontend/`              | `aharbii/movie-finder-frontend`       | Angular 21 SPA                 |
+| `docs/`                  | `aharbii/movie-finder-docs`           | MkDocs documentation           |
+| `infrastructure/`        | `aharbii/movie-finder-infrastructure` | IaC / Azure provisioning       |
 
 ### Technology stack
 
-| Layer | Stack |
-|---|---|
-| Language | Python 3.13 (standalone repo, Docker-only local workflow) |
-| Data | `kagglehub`, `pandas`, `pydantic` |
-| Embeddings | `openai` SDK — `text-embedding-3-large`, 3072-dim |
-| Vector store | `qdrant-client` (Qdrant Cloud only) |
-| Linting | `ruff` (line-length 100, rules: E/W/F/I/B/UP) |
-| Type checking | `mypy --strict` (Python 3.13) |
-| Tests | `pytest`, `pytest-cov` |
-| CI | Jenkins Multibranch → Azure Container Registry |
+| Layer         | Stack                                                     |
+| ------------- | --------------------------------------------------------- |
+| Language      | Python 3.13 (standalone repo, Docker-only local workflow) |
+| Data          | `kagglehub`, `pandas`, `pydantic`                         |
+| Embeddings    | `openai` SDK — `text-embedding-3-large`, 3072-dim         |
+| Vector store  | `qdrant-client` (Qdrant Cloud only)                       |
+| Linting       | `ruff` (line-length 100, rules: E/W/F/I/B/UP)             |
+| Type checking | `mypy --strict` (Python 3.13)                             |
+| Tests         | `pytest`, `pytest-cov`                                    |
+| CI            | Jenkins Multibranch → Azure Container Registry            |
 
 ### Environment variables (`.env.example`)
 
@@ -61,12 +61,12 @@ KAGGLE_API_TOKEN
 
 ## Design patterns to follow
 
-| Pattern | Where | Rule |
-|---|---|---|
-| **Strategy** | Embedding providers | New provider = new class implementing the embedding interface. Never add `if provider == "openai":` in the ingestion loop. |
-| **Strategy** | Vector store backends | `qdrant` and `chromadb` are strategies behind a common interface. Add new stores the same way. |
-| **Configuration object** | `config.py` / Pydantic `BaseSettings` | All env vars loaded once. Never call `os.getenv()` inside pipeline functions. |
-| **Factory** | Provider instantiation | Provider objects are created in one place (entrypoint / factory function), not scattered throughout pipeline steps. |
+| Pattern                  | Where                                 | Rule                                                                                                                       |
+| ------------------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Strategy**             | Embedding providers                   | New provider = new class implementing the embedding interface. Never add `if provider == "openai":` in the ingestion loop. |
+| **Strategy**             | Vector store backends                 | `qdrant` and `chromadb` are strategies behind a common interface. Add new stores the same way.                             |
+| **Configuration object** | `config.py` / Pydantic `BaseSettings` | All env vars loaded once. Never call `os.getenv()` inside pipeline functions.                                              |
+| **Factory**              | Provider instantiation                | Provider objects are created in one place (entrypoint / factory function), not scattered throughout pipeline steps.        |
 
 ---
 
@@ -90,15 +90,15 @@ KAGGLE_API_TOKEN
 make pre-commit
 ```
 
-| Hook | Notes |
-|---|---|
-| `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-case-conflict`, `check-merge-conflict` | File health |
-| `check-added-large-files`, `check-illegal-windows-names`, `detect-private-key` | Safety |
-| `pretty-format-json` | JSON files auto-formatted |
-| `sort-simple-yaml` | YAML keys sorted |
-| `detect-secrets` | No API keys or tokens |
-| `mypy` (strict, Python 3.13, extra dep: `pydantic`) | Type checking |
-| `ruff-check --fix`, `ruff-format` | Linting and formatting |
+| Hook                                                                                                    | Notes                     |
+| ------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-case-conflict`, `check-merge-conflict` | File health               |
+| `check-added-large-files`, `check-illegal-windows-names`, `detect-private-key`                          | Safety                    |
+| `pretty-format-json`                                                                                    | JSON files auto-formatted |
+| `sort-simple-yaml`                                                                                      | YAML keys sorted          |
+| `detect-secrets`                                                                                        | No API keys or tokens     |
+| `mypy` (strict, Python 3.13, extra dep: `pydantic`)                                                     | Type checking             |
+| `ruff-check --fix`, `ruff-format`                                                                       | Linting and formatting    |
 
 **Never `--no-verify`.** False-positive → `# pragma: allowlist secret` + `detect-secrets scan > .secrets.baseline`.
 
@@ -107,6 +107,7 @@ make pre-commit
 ## VSCode setup
 
 `backend/rag_ingestion/.vscode/` is committed with a full workspace configuration:
+
 - `settings.json` — attached-container interpreter (`/opt/venv/bin/python`), Ruff, mypy strict, pytest
 - `extensions.json` — Remote Containers, Python, debugpy, Ruff, mypy, Coverage Gutters, Makefile Tools
 - `launch.json` — ingestion pipeline runner + pytest profiles for the attached `rag` container
@@ -162,28 +163,30 @@ Conventional Commits: `feat(rag): add Gemini embedding provider`
 
 Full detail in `ai-context/issue-agent-briefing-template.md`.
 
-| # | Category | Key gate |
-|---|---|---|
-| 1 | **Issues** | Parent `aharbii/movie-finder` + child here only if this repo changes; templates inspected |
-| 2 | **Branch** | `feature/fix/chore/docs` in this repo + pointer-bump `chore/` in `backend/` and root |
-| 3 | **ADR** | New embedding provider, new vector store, or new external dep → ADR in `docs/` |
-| 4 | **Implementation** | Strategy pattern for new providers; `ruff`+`mypy --strict` pass; pre-commit pass |
-| 5 | **Tests** | `pytest --cov` passes; coverage doesn't regress |
-| 6 | **Env & secrets** | `.env.example` updated here + `backend/` + `chain/` if embedding model shared + root; new keys → Key Vault + Jenkins |
-| 7 | **Docker** | `Dockerfile` + `docker-compose.yml` updated for dep/env changes |
-| 8 | **CI** | `Jenkinsfile` reviewed; `ingestion-outputs.env` artifact format still valid |
-| 9 | **Diagrams** | `02-system-architecture.puml` or `03-backend-architecture.puml` if provider changes; `workspace.dsl` if new external system; commit to `docs/` first; **never `.mdj`** |
-| 9a | **Docs** | `docs/` pages (ingestion guide, embedding config); `README.md` + `CHANGELOG.md` updated |
+| #   | Category           | Key gate                                                                                                                                                               |
+| --- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Issues**         | Parent `aharbii/movie-finder` + child here only if this repo changes; templates inspected                                                                              |
+| 2   | **Branch**         | `feature/fix/chore/docs` in this repo + pointer-bump `chore/` in `backend/` and root                                                                                   |
+| 3   | **ADR**            | New embedding provider, new vector store, or new external dep → ADR in `docs/`                                                                                         |
+| 4   | **Implementation** | Strategy pattern for new providers; `ruff`+`mypy --strict` pass; pre-commit pass                                                                                       |
+| 5   | **Tests**          | `pytest --cov` passes; coverage doesn't regress                                                                                                                        |
+| 6   | **Env & secrets**  | `.env.example` updated here + `backend/` + `chain/` if embedding model shared + root; new keys → Key Vault + Jenkins                                                   |
+| 7   | **Docker**         | `Dockerfile` + `docker-compose.yml` updated for dep/env changes                                                                                                        |
+| 8   | **CI**             | `Jenkinsfile` reviewed; `ingestion-outputs.env` artifact format still valid                                                                                            |
+| 9   | **Diagrams**       | `02-system-architecture.puml` or `03-backend-architecture.puml` if provider changes; `workspace.dsl` if new external system; commit to `docs/` first; **never `.mdj`** |
+| 9a  | **Docs**           | `docs/` pages (ingestion guide, embedding config); `README.md` + `CHANGELOG.md` updated                                                                                |
 
 ### 10. Sibling submodules likely affected
-| Submodule | Why |
-|---|---|
-| `backend/chain/` | Embedding model at query time must match ingestion — coordinate changes |
-| `backend/` | New env vars may need to pass through the backend workspace |
-| `infrastructure/` | New Azure AI service or new secret → infra and Key Vault update |
-| `docs/` | Architecture diagrams, ingestion runbook |
+
+| Submodule         | Why                                                                     |
+| ----------------- | ----------------------------------------------------------------------- |
+| `backend/chain/`  | Embedding model at query time must match ingestion — coordinate changes |
+| `backend/`        | New env vars may need to pass through the backend workspace             |
+| `infrastructure/` | New Azure AI service or new secret → infra and Key Vault update         |
+| `docs/`           | Architecture diagrams, ingestion runbook                                |
 
 ### 11. Submodule pointer bump
+
 ```bash
 # in backend/ repo
 git add rag_ingestion && git commit -m "chore(rag): bump to latest main"
@@ -192,6 +195,7 @@ git add backend && git commit -m "chore(backend): bump to latest main"
 ```
 
 ### 12. Pull request
+
 - [ ] PR in `aharbii/movie-finder-rag` discloses the AI authoring tool + model
 - [ ] PR in `aharbii/movie-finder-backend` (pointer bump)
 - [ ] PR in `aharbii/movie-finder` (pointer bump)
