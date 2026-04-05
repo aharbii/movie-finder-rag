@@ -1,49 +1,95 @@
+"""Logging utilities for the rag_ingestion package.
+
+Library code never configures the logging system — it only obtains loggers.
+Configuration is the responsibility of the entry point that calls
+``configure_logging()`` before running the ingestion pipeline.
+
+``get_logger`` is a thin backward-compatible shim with an ignored ``debug``
+parameter.  Log level is controlled by the ``LOG_LEVEL`` environment variable
+set at the entry-point level, not per-logger.
+"""
+
+from __future__ import annotations
+
+import json
 import logging
 import os
-import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 
-def get_logger(name: str, debug: bool = False) -> logging.Logger:
-    """
-    Get a pre-configured logger with console and file handlers.
+def get_logger(name: str, debug: bool = False) -> logging.Logger:  # noqa: ARG001
+    """Return a stdlib logger for the given name.
+
+    The ``debug`` parameter is accepted for backward compatibility but is
+    ignored — log level is controlled by ``configure_logging()`` via the
+    ``LOG_LEVEL`` environment variable.
 
     Args:
-        name (str): Name of the logger, typically __name__.
-        debug (bool): If True, set the logging level to DEBUG.
+        name: Logger name, typically ``__name__``.
+        debug: Ignored. Kept for backward compatibility.
 
     Returns:
-        logging.Logger: Configured logger instance.
+        A ``logging.Logger`` instance.
     """
-    logger = logging.getLogger(name)
+    return logging.getLogger(name)
 
-    # Avoid adding handlers multiple times if the logger is already configured
-    if not logger.handlers:
-        logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
-        # Standard format used across the movie-finder project
+class _JsonFormatter(logging.Formatter):
+    """JSON formatter for structured log output."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Serialize a log record to a single-line JSON string.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            A JSON-encoded log entry string.
+        """
+        data: dict[str, object] = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            data["exception"] = self.formatException(record.exc_info)
+        return json.dumps(data, ensure_ascii=False)
+
+
+def configure_logging() -> None:
+    """Bootstrap logging for the rag_ingestion pipeline.
+
+    Reads ``LOG_LEVEL`` (default ``INFO``) and ``LOG_FORMAT`` (default ``text``)
+    from the environment.  Idempotent — safe to call multiple times.
+
+    No file handlers are created — output goes to stdout only, which is
+    appropriate for both interactive runs and containerised CI execution.
+    """
+    if logging.getLogger("rag").handlers:
+        return  # already configured
+
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_format = os.environ.get("LOG_FORMAT", "text").lower()
+    level: int = getattr(logging, level_name, logging.INFO)
+
+    if log_format == "json":
+        formatter: logging.Formatter = _JsonFormatter()
+    else:
         formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-        # Console handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
 
-        # File handler for persistent logging during ingestion runs
-        log_dir = "logs"
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+    rag_logger = logging.getLogger("rag")
+    rag_logger.setLevel(level)
+    rag_logger.addHandler(handler)
+    rag_logger.propagate = False
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, f"rag_ingestion_{timestamp}.log")
-
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-        logger.debug(f"Logger initialized for {name} with level {'DEBUG' if debug else 'INFO'}")
-
-    return logger
+    _quiet_libs = ("httpx", "httpcore", "openai")
+    quiet_level = logging.DEBUG if level == logging.DEBUG else logging.WARNING
+    for lib in _quiet_libs:
+        logging.getLogger(lib).setLevel(quiet_level)

@@ -85,6 +85,7 @@ pipeline {
                         id: 'coverage',
                         name: 'RAG Coverage',
                         sourceCodeRetention: 'EVERY_BUILD',
+                        sourceDirectories: [[path: 'src']],
                         failOnError: false,
                         qualityGates: [
                             [threshold: 80.0, metric: 'LINE', baseline: 'PROJECT'],
