@@ -77,10 +77,10 @@ pipeline {
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'junit.xml'
+                    junit allowEmptyResults: true, testResults: 'reports/junit.xml'
                     recordCoverage(
                         tools: [
-                            [parser: 'COBERTURA', pattern: 'coverage.xml']
+                            [parser: 'COBERTURA', pattern: 'reports/coverage.xml']
                         ],
                         id: 'coverage',
                         name: 'RAG Coverage',

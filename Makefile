@@ -36,9 +36,9 @@ GIT_HOOKS_DIR := $(GIT_DIR_HOST)/hooks
 export RAG_GIT_DIR := $(GIT_DIR_HOST)
 
 SOURCE_PATHS := .
-COVERAGE_XML ?= coverage.xml
-COVERAGE_HTML ?= htmlcov
-JUNIT_XML ?= junit.xml
+COVERAGE_XML ?= reports/coverage.xml
+COVERAGE_HTML ?= reports/htmlcov
+JUNIT_XML ?= reports/junit.xml
 
 # ---------------------------------------------------------------------------
 # exec when running, run --rm otherwise — avoids container startup overhead
@@ -151,12 +151,12 @@ test:
 	$(call exec_or_run,pytest tests/ -v --tb=short)
 
 test-coverage:
-	$(call exec_or_run,pytest tests/ -v --tb=short \
+	$(call exec_or_run,sh -c 'mkdir -p reports && pytest tests/ -v --tb=short \
 		--junitxml=$(JUNIT_XML) \
 		--cov=rag \
 		--cov-report=term-missing \
 		--cov-report=xml:$(COVERAGE_XML) \
-		--cov-report=html:$(COVERAGE_HTML))
+		--cov-report=html:$(COVERAGE_HTML)')
 
 detect-secrets:
 	$(call exec_or_run,detect-secrets scan --baseline .secrets.baseline) # pragma: allowlist secret
@@ -173,9 +173,7 @@ clean:
 	$(call exec_or_run,find . -type d -name ".mypy_cache" -not -path "./.git/*" -exec rm -rf {} + 2>/dev/null || true)
 	$(call exec_or_run,find . -type d -name ".ruff_cache" -not -path "./.git/*" -exec rm -rf {} + 2>/dev/null || true)
 	$(call exec_or_run,find . -name "*.egg-info" -not -path "./.git/*" -exec rm -rf {} + 2>/dev/null || true)
-	$(call exec_or_run,find . -name "$(COVERAGE_XML)" -not -path "./.git/*" -delete 2>/dev/null || true)
-	$(call exec_or_run,find . -name "$(JUNIT_XML)" -not -path "./.git/*" -delete 2>/dev/null || true)
-	$(call exec_or_run,find . -type d -name "$(COVERAGE_HTML)" -not -path "./.git/*" -exec rm -rf {} + 2>/dev/null || true)
+	$(call exec_or_run,rm -rf reports/)
 	@echo "Clean complete."
 
 clean-docker: ci-down
