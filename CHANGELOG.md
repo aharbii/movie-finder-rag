@@ -29,6 +29,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Tests now use stubbed Qdrant clients instead of real external API calls so CI can run without
   live Qdrant/OpenAI credentials
 - `src/rag/ingestion/csv_loader.py`: Improved parsing of `genre` and `cast` fields into lists.
+- All test outputs (`junit.xml`, `coverage.xml`, `htmlcov/`) now written to a `reports/`
+  subdirectory; `Makefile` paths updated accordingly; `.gitignore` updated to a single
+  `reports/` entry
+- GitHub Actions CI workflow updated: added `EnricoMi/publish-unit-test-result-action@v2`,
+  `irongut/CodeCoverageSummary@v1.3.0`, and `marocchino/sticky-pull-request-comment@v2`
+  reporting plugins mirroring Jenkins plugin behaviour; removed Build App Image stage
 
 ### Fixed
 
