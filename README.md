@@ -1,4 +1,4 @@
-# movie-finder-rag
+# Movie Finder RAG
 
 Offline ingestion pipeline for Movie Finder. Downloads the [Wikipedia Movie Plots](https://www.kaggle.com/datasets/jrobischon/wikipedia-movie-plots) Kaggle dataset, generates OpenAI embeddings, and upserts them into a Qdrant Cloud collection.
 

@@ -1,5 +1,5 @@
 # =============================================================================
-# movie-finder-rag — Docker-only developer contract
+# Movie Finder RAG — Docker-only developer contract
 #
 # Usage:
 #   make help
@@ -54,7 +54,7 @@ endef
 
 help:
 	@echo ""
-	@echo "movie-finder-rag — available targets"
+	@echo "Movie Finder RAG — available targets"
 	@echo "===================================="
 	@echo ""
 	@echo "  Setup"

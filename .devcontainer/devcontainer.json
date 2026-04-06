@@ -41,7 +41,10 @@
   "forwardPorts": [],
   "name": "movie-finder-rag",
   "overrideCommand": false,
-  "postCreateCommand": "echo 'RAG devcontainer ready. Run: make up'",
+  "postCreateCommand": "git config --global --add safe.directory /workspace && git config --global --add safe.directory '*' && echo 'RAG devcontainer ready. Run: make up'",
+  "remoteEnv": {
+    "GIT_DISCOVERY_ACROSS_FILESYSTEM": "1"
+  },
   "remoteUser": "root",
   "service": "rag",
   "shutdownAction": "stopCompose",
