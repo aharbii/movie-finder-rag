@@ -19,7 +19,7 @@ def backup() -> None:
     qdrant_client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key_rw)
 
     # Initialize the local backup store to ensure it exists
-    ChromaDBVectorStore(debug=True)
+    ChromaDBVectorStore()
     OpenAIEmbeddingProvider()
 
     collection_name = settings.qdrant_collection_name

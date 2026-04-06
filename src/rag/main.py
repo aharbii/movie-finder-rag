@@ -20,7 +20,7 @@ def main() -> None:
     Resolves configuration via Pydantic and triggers the ingestion flow.
     """
     # 1. Download data from Kaggle if not present
-    dataset.download_data(debug=True)
+    dataset.download_data()
 
     # 2. Resolve embedding provider based on runtime settings
     embedding_provider: EmbeddingProvider
@@ -36,10 +36,10 @@ def main() -> None:
         return
 
     # 3. Initialize vector store (Qdrant Cloud)
-    vector_store = QdrantVectorStore(debug=True)
+    vector_store = QdrantVectorStore()
 
     # 4. Trigger the ingestion pipeline
-    pipeline.ingest_csv(embedding_provider, vector_store, debug=True)
+    pipeline.ingest_csv(embedding_provider, vector_store)
 
 
 if __name__ == "__main__":

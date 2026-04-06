@@ -23,9 +23,9 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         ),
     }
 
-    def __init__(self, model: str = settings.gemini_embedding_model, debug: bool = False) -> None:
+    def __init__(self, model: str = settings.gemini_embedding_model) -> None:
         """Initialize the Gemini provider using settings."""
-        self.logger = get_logger(self.__class__.__name__, debug)
+        self.logger = get_logger(self.__class__.__name__)
         self.model = model
 
         if not settings.google_api_key:

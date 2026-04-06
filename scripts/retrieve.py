@@ -27,7 +27,7 @@ def interactive_retrieve() -> None:
     else:
         provider = GeminiEmbeddingProvider()
 
-    store = QdrantVectorStore(debug=False)
+    store = QdrantVectorStore()
     model_info = provider.model_info
 
     print(f"\n🔗 Connected to Qdrant collection: '{settings.qdrant_collection_name}'")

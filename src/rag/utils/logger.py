@@ -4,9 +4,8 @@ Library code never configures the logging system — it only obtains loggers.
 Configuration is the responsibility of the entry point that calls
 ``configure_logging()`` before running the ingestion pipeline.
 
-``get_logger`` is a thin backward-compatible shim with an ignored ``debug``
-parameter.  Log level is controlled by the ``LOG_LEVEL`` environment variable
-set at the entry-point level, not per-logger.
+Log level is controlled by the ``LOG_LEVEL`` environment variable at the
+entry-point level — never per-logger.
 """
 
 from __future__ import annotations
@@ -17,16 +16,11 @@ import os
 from datetime import UTC, datetime
 
 
-def get_logger(name: str, debug: bool = False) -> logging.Logger:  # noqa: ARG001
+def get_logger(name: str) -> logging.Logger:
     """Return a stdlib logger for the given name.
 
-    The ``debug`` parameter is accepted for backward compatibility but is
-    ignored — log level is controlled by ``configure_logging()`` via the
-    ``LOG_LEVEL`` environment variable.
-
     Args:
-        name: Logger name, typically ``__name__``.
-        debug: Ignored. Kept for backward compatibility.
+        name: Logger name, typically ``__name__`` or ``self.__class__.__name__``.
 
     Returns:
         A ``logging.Logger`` instance.

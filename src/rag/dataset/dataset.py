@@ -7,17 +7,14 @@ import kagglehub
 from rag.utils.logger import get_logger
 
 
-def download_data(debug: bool = False) -> str:
+def download_data() -> str:
     """
     Download the movie dataset from Kaggle if not already present.
-
-    Args:
-        debug (bool): Enable verbose logging.
 
     Returns:
         str: The path to the downloaded dataset.
     """
-    logger = get_logger(__name__, debug)
+    logger = get_logger(__name__)
     dataset_handle = "jrobischon/wikipedia-movie-plots"
     dataset_path = Path("dataset")
 

@@ -12,14 +12,9 @@ class ChromaDBVectorStore(VectorStore):
     Local vector store implementation using ChromaDB for developer use and backups.
     """
 
-    def __init__(self, debug: bool = False) -> None:
-        """
-        Initialize the local ChromaDB client.
-
-        Args:
-            debug (bool): Enable debug logging.
-        """
-        self.logger = get_logger(self.__class__.__name__, debug)
+    def __init__(self) -> None:
+        """Initialize the local ChromaDB client."""
+        self.logger = get_logger(self.__class__.__name__)
         self.client = chromadb.Client()
 
     def upsert(
