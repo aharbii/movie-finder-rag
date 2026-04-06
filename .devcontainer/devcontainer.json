@@ -1,0 +1,49 @@
+{
+  "customizations": {
+    "jetbrains": {
+      "backend": "PyCharm",
+      "projectType": "python"
+    },
+    "vscode": {
+      "extensions": [
+        "ms-vscode-remote.remote-containers",
+        "ms-python.python",
+        "ms-python.pylance",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
+        "ryanluker.vscode-coverage-gutters",
+        "ms-vscode.makefile-tools"
+      ],
+      "settings": {
+        "[python]": {
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          },
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true
+        },
+        "editor.rulers": [
+          100
+        ],
+        "python.analysis.extraPaths": [
+          "/workspace/src"
+        ],
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "python.testing.pytestEnabled": true
+      }
+    }
+  },
+  "dockerComposeFile": "../docker-compose.yml",
+  "forwardPorts": [],
+  "name": "movie-finder-rag",
+  "overrideCommand": false,
+  "postCreateCommand": "echo 'RAG devcontainer ready. Run: make up'",
+  "remoteUser": "root",
+  "service": "rag",
+  "shutdownAction": "stopCompose",
+  "workspaceFolder": "/workspace"
+}
