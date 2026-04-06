@@ -39,17 +39,14 @@ def test_main_gemini(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_main_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
+    # logger is bound at module import time, so we patch the module-level
+    # variable directly rather than patching get_logger.
     monkeypatch.setattr(settings, "embedding_provider", "unsupported")
 
-    with patch("rag.main.dataset.download_data"), patch("rag.main.get_logger") as mock_get_logger:
-        mock_logger = MagicMock()
-        mock_get_logger.return_value = mock_logger
+    mock_logger = MagicMock()
+    with patch("rag.main.dataset.download_data"), patch("rag.main.logger", mock_logger):
         main()
-        mock_logger.error.assert_called()
-        # Find the call that contains the expected message
-        found = False
-        for call in mock_logger.error.call_args_list:
-            if "Unsupported embedding provider" in str(call):
-                found = True
-                break
-        assert found
+
+    mock_logger.error.assert_called()
+    error_calls = " ".join(str(c) for c in mock_logger.error.call_args_list)
+    assert "Unsupported embedding provider" in error_calls

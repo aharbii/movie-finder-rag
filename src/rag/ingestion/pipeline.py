@@ -10,7 +10,6 @@ from rag.vectorstore.base import VectorStore
 def ingest_csv(
     embedding_provider: EmbeddingProvider,
     vector_store: VectorStore,
-    debug: bool = False,
 ) -> None:
     """
     Orchestrates the offline RAG ingestion pipeline.
@@ -24,12 +23,11 @@ def ingest_csv(
     Args:
         embedding_provider (EmbeddingProvider): The provider instance (e.g. OpenAI).
         vector_store (VectorStore): The vector store target (e.g. Qdrant).
-        debug (bool): Enable verbose logging.
     """
-    logger = get_logger(__name__, debug)
+    logger = get_logger(__name__)
 
     logger.info("Initializing RAG ingestion pipeline...")
-    movies = csv_loader.load_movies(debug=debug)
+    movies = csv_loader.load_movies()
 
     if not movies:
         logger.warning("No movies found to ingest. Pipeline finished.")

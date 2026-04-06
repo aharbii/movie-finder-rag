@@ -20,17 +20,13 @@ class QdrantVectorStore(VectorStore):
     Integrates with Qdrant Cloud via Pydantic settings.
     """
 
-    def __init__(self, debug: bool = False) -> None:
-        """
-        Initialize the Qdrant client using settings.
-
-        Args:
-            debug (bool): Enable debug logging.
+    def __init__(self) -> None:
+        """Initialize the Qdrant client using settings.
 
         Raises:
             QdrantVectorStoreError: If environment configuration is missing.
         """
-        self.logger = get_logger(self.__class__.__name__, debug)
+        self.logger = get_logger(self.__class__.__name__)
 
         self._validate_env()
 

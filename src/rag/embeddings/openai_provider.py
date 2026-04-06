@@ -30,15 +30,13 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         ),
     }
 
-    def __init__(self, model: str = settings.openai_embedding_model, debug: bool = False) -> None:
-        """
-        Initialize the OpenAI provider using settings.
+    def __init__(self, model: str = settings.openai_embedding_model) -> None:
+        """Initialize the OpenAI provider using settings.
 
         Args:
             model (str): The OpenAI model name to use.
-            debug (bool): Enable verbose logging.
         """
-        self.logger = get_logger(self.__class__.__name__, debug)
+        self.logger = get_logger(self.__class__.__name__)
         self.model = model
 
         if self.model not in self.MODELS:

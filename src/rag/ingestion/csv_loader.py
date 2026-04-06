@@ -7,14 +7,13 @@ from rag.utils.logger import get_logger
 
 
 def load_movies(
-    file_path: str = "dataset/wiki_movie_plots_deduped.csv", debug: bool = False
+    file_path: str = "dataset/wiki_movie_plots_deduped.csv",
 ) -> list[Movie]:
     """
     Filter the Kaggle dataset for American and British movies and map to Typed objects.
 
     Args:
         file_path (str): The path to the CSV file.
-        debug (bool): Enable debug logging.
 
     Returns:
         list[Movie]: A list of Movie objects filtered for supported origins.
@@ -22,7 +21,7 @@ def load_movies(
     Raises:
         FileNotFoundError: If the dataset file does not exist.
     """
-    logger = get_logger(__name__, debug)
+    logger = get_logger(__name__)
 
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Dataset not found at {file_path}")

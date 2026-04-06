@@ -1,0 +1,153 @@
+# =============================================================================
+# movie-finder-rag — GitHub Actions CI
+#
+# Mirrors the Jenkins Multibranch pipeline 1:1.
+# Both pipelines must remain in sync. Changes to build logic must be applied
+# to both Jenkinsfile and this file.
+#
+# Modes:
+#   Contribution   — PR + feature branches: Lint · Typecheck · Test
+#   Manual ingest  — workflow_dispatch with run_ingestion=true:
+#                    Lint · Typecheck · Test · Ingest against Qdrant Cloud
+#
+# Required GitHub Actions secrets (for Ingest only):
+#   QDRANT_URL          Qdrant Cloud endpoint
+#   QDRANT_API_KEY_RW   Read-write API key
+#   OPENAI_API_KEY      For embedding model
+#   KAGGLE_API_TOKEN    For dataset download (JSON string)
+# =============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      run_ingestion:
+        type: boolean
+        default: false
+        description: Run the offline ingestion pipeline against Qdrant Cloud.
+      collection_name:
+        type: string
+        default: movies
+        description: Qdrant collection name to write to.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # -------------------------------------------------------------------------- #
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize
+        run: make init
+
+      - name: Lint
+        run: make lint
+
+  # -------------------------------------------------------------------------- #
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize
+        run: make init
+
+      - name: Typecheck
+        run: make typecheck
+
+  # -------------------------------------------------------------------------- #
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize
+        run: make init
+
+      - name: Test with coverage
+        run: make test-coverage
+
+      - name: Publish test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: reports/junit.xml
+
+      - name: Generate coverage summary
+        if: always()
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: reports/coverage.xml
+          badge: true
+          fail_below_min: false
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: '10 80'
+
+      - name: Post coverage comment
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: code-coverage-results.md
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: reports/
+
+  # -------------------------------------------------------------------------- #
+  ingest:
+    name: Ingest
+    needs: [lint, typecheck, test]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_ingestion == 'true'
+    env:
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY_RW: ${{ secrets.QDRANT_API_KEY_RW }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+      QDRANT_COLLECTION_NAME: ${{ github.event.inputs.collection_name || 'movies' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize
+        run: make init
+
+      - name: Run ingestion
+        run: make ingest
+
+      - name: Upload ingestion outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingestion-outputs
+          path: ingestion-outputs.env
+          if-no-files-found: ignore

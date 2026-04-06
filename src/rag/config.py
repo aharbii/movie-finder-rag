@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,11 +11,9 @@ class RAGConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Qdrant Cloud (Write-capable key)
+    # Qdrant Cloud (Write-capable key required for ingestion)
     qdrant_url: str = Field(..., validation_alias="QDRANT_URL")
-    qdrant_api_key_rw: str = Field(
-        ..., validation_alias=AliasChoices("QDRANT_API_KEY_RW", "QDRANT_API_KEY_RO")
-    )
+    qdrant_api_key_rw: str = Field(..., validation_alias="QDRANT_API_KEY_RW")
     qdrant_collection_name: str = Field("movies", validation_alias="QDRANT_COLLECTION_NAME")
 
     # OpenAI Embeddings
