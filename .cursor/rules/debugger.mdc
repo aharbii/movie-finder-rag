@@ -1,0 +1,37 @@
+---
+description: Debugging the RAG ingestion pipeline. Activate when investigating ingestion failures, embedding mismatches, or Qdrant collection issues.
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# Debugger — rag
+
+## Investigation sequence
+
+1. Check the ingestion log for the last run — where did it stop?
+2. Verify embedding model match: `EMBEDDING_MODEL` in `rag/.env` must equal `EMBEDDING_MODEL` in `chain/.env`
+3. Check Qdrant collection status using the evaluator MCP tool
+4. Verify the vector dimension in the collection matches `EMBEDDING_DIMENSION`
+5. Check for partial ingestion (some movies missing) vs. failed ingestion (collection empty)
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `src/rag/ingest.py` | Main ingestion script |
+| `src/rag/embedder.py` | OpenAI embedding calls |
+| `src/rag/qdrant_client.py` | Qdrant write operations |
+| `.env` / `.env.example` | Collection name, model, API keys |
+
+## Common failure patterns
+
+| Symptom | Likely cause |
+|---------|-------------|
+| 0 results from semantic search in chain | Embedding model mismatch between rag and chain |
+| Ingestion stops mid-run | OpenAI rate limit (429) — check retry logic |
+| Qdrant 400 on upsert | Vector dimension mismatch — check `EMBEDDING_DIMENSION` |
+| `sys.exit(1)` in logs | Issue #6 — QdrantVectorStore library code — note in report |
+
+## Anti-Focus
+
+Do NOT fix the code. Produce a defect report. Leave fixes to Developer.

@@ -1,0 +1,43 @@
+---
+description: Developer workflow for the RAG ingestion submodule. Activate when implementing a GitHub issue in this repo.
+alwaysApply: false
+---
+
+# Developer — rag
+
+## Workflow
+
+1. `gh issue view <N> --repo aharbii/movie-finder-rag`
+2. Find `## Agent Briefing` — if missing, stop and ask
+3. Read only the files listed in the briefing
+4. Create branch from `main`: `feature/`, `fix/`, `chore/`, `docs/`
+5. Implement, run `make check`
+6. Commit → PR in `aharbii/movie-finder-rag`
+
+## Quality checks
+
+```bash
+make check    # ruff + mypy --strict + pytest
+```
+
+## Critical constraint
+
+**Never change `EMBEDDING_MODEL` or `EMBEDDING_DIMENSION` without:**
+1. Writing an ADR
+2. Coordinating with `chain/` team
+3. Scheduling a full re-ingestion run
+4. Updating both `rag/.env.example` and `chain/.env.example`
+
+## After PR merges — pointer bump
+
+```bash
+# rag is a direct root submodule — one-level bump
+git add rag
+git commit -m "chore(rag): bump to latest main"
+```
+
+## Anti-Focus
+
+- Do not query Qdrant with the production read-write key in tests
+- Do not call the live OpenAI API in tests — mock it
+- Do not modify the embedding dimension without full re-ingestion plan

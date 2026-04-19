@@ -1,0 +1,41 @@
+---
+description: Python standards for the RAG ingestion submodule.
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# Python Standards — rag
+
+All root Python standards apply. RAG-specific additions:
+
+## Critical embedding constraint
+
+**The embedding model MUST match the model used at query time in `chain/`.**
+
+Current: `text-embedding-3-large` (3072 dimensions)
+
+If this ever changes:
+1. Write an ADR in `docs/architecture/decisions/`
+2. Re-ingest ALL movies — partial re-ingestion is not valid
+3. Update `chain/.env.example` and `rag/.env.example` simultaneously
+4. Coordinate with the `chain/` team before any merge
+
+## Batch processing
+
+- Always use `asyncio.gather()` for parallel embedding calls — never sequential loops
+- Respect OpenAI rate limits — use a semaphore to bound concurrent requests
+- Log progress — ingestion runs for hours, progress visibility is essential
+
+## Testing
+
+```bash
+make test     # pytest
+make check    # lint + typecheck + test
+```
+
+Ingestion tests must use mock OpenAI responses — never call the live API in CI.
+Qdrant tests must use the read-only key or a local Qdrant instance — never the production cluster.
+
+## No batch embedding yet
+
+Issue #19 tracks the absence of batch embedding. Do not add sequential calls as a workaround — fix the root issue or leave a TODO referencing #19.

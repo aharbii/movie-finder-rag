@@ -1,0 +1,45 @@
+---
+description: Movie Finder — rag submodule context. Always active.
+alwaysApply: true
+---
+
+# rag — Offline Embedding Ingestion
+
+This is `movie-finder-rag` (`rag/`) — standalone tool for ingesting movie data into Qdrant.
+GitHub repo: `aharbii/movie-finder-rag` · Tracker: `aharbii/movie-finder`
+**Standalone uv project** — not a member of the `backend/` workspace.
+
+## What this submodule does
+
+Offline ETL pipeline: fetches movie data from Kaggle → generates OpenAI embeddings → upserts into Qdrant Cloud.
+
+- **Source:** Kaggle dataset (via `kaggle-mcp` or direct API)
+- **Embeddings:** OpenAI `text-embedding-3-large` (3072-dim) — **must match `chain/`**
+- **Destination:** Qdrant Cloud (always external — no local container)
+- **Run mode:** One-shot batch process, not a long-running service
+
+## Key files
+
+```
+src/
+├── config.py        # Pydantic BaseSettings — Qdrant, OpenAI, Kaggle credentials
+├── ingest.py        # Main ingestion pipeline
+├── embedder.py      # OpenAI embedding provider (Strategy pattern)
+└── qdrant_store.py  # Qdrant upsert client
+pyproject.toml       # Standalone uv project (not backend workspace member)
+```
+
+## Critical constraint
+
+The embedding model (`text-embedding-3-large`, 3072 dimensions) and the Qdrant collection schema **must be identical** between this repo and `backend/chain/`. Changing either requires coordinated changes in both repos.
+
+## Quality checks
+
+```bash
+uv run pre-commit run --all-files
+uv run pytest
+```
+
+## Personas available
+
+`/developer` (ingestion pipeline changes), `/sdet` (edge cases: empty datasets, Qdrant timeouts), `/architect` (embedding strategy decisions).

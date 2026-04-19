@@ -1,0 +1,25 @@
+# Movie Finder RAG — Cursor Rules
+
+This file is a legacy fallback. Cursor loads the richer MDC rules from `.cursor/rules/` automatically.
+
+If your IDE supports MDC rules, the following files apply:
+- `.cursor/rules/project.mdc` — always active (rag context, key files)
+- `.cursor/rules/python.mdc` — activates on `**/*.py` (Python standards, mypy, ruff)
+- `.cursor/rules/architect.mdc` — activates when designing embedding or Qdrant changes
+- `.cursor/rules/developer.mdc` — activates when implementing issues
+- `.cursor/rules/debugger.mdc` — activates when investigating ingestion failures
+
+---
+
+## Quick reference
+
+**Repo:** `aharbii/movie-finder-rag` · Primary context: `CLAUDE.md`
+
+**Non-negotiables:**
+- Embedding model is OpenAI `text-embedding-3-large` (3072-dim) — changing it requires full re-ingestion and an ADR
+- Qdrant is always external (cloud) — no local Qdrant container, ever
+- Strategy pattern for embedding providers — no `if provider == "openai":` branching
+- `mypy --strict` must pass; no bare `except:`; no `print()` — use logging
+- Never `--no-verify` on pre-commit
+- Conventional Commits: `feat(rag): summary`
+- Disclose AI tool + model in every PR
