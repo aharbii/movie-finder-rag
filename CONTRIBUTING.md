@@ -100,6 +100,30 @@ make check          # lint + typecheck + test
 make backup
 ```
 
+This target runs through Docker Compose, not the host Python environment. For the current Qdrant
+adapter, the existing `.env` values (`QDRANT_URL`, `QDRANT_API_KEY_RW`, `QDRANT_COLLECTION_NAME`)
+are enough.
+
+The backup utility is intentionally script-local and CI-friendly. It also accepts generic
+vector-store inputs through CLI args or env vars:
+
+```bash
+make backup BACKUP_ARGS="--vector-store qdrant --collection-name movies"
+```
+
+Script-specific env fallbacks:
+
+| Variable                 | Purpose                            |
+| ------------------------ | ---------------------------------- |
+| `VECTOR_STORE`           | Backup source type                 |
+| `VECTOR_STORE_URL`       | Live vector store endpoint         |
+| `VECTOR_STORE_API_KEY`   | Live vector store API key          |
+| `BACKUP_COLLECTION_NAME` | Collection name to back up         |
+| `BACKUP_OUTPUT_ROOT`     | Output root for archived artifacts |
+| `BACKUP_BATCH_SIZE`      | Source pagination batch size       |
+
+Generated artifacts are written under `outputs/backups/chromadb/`.
+
 ### Run interactive retrieval app
 
 ```bash
@@ -169,12 +193,19 @@ Follow these rules:
 The Jenkins pipeline executes through the Docker Makefile to ensure environment parity between
 local and CI runs.
 
-| Stage            | Command / trigger                   | Notes                            |
-| ---------------- | ----------------------------------- | -------------------------------- |
-| Lint + Typecheck | `make lint` + `make typecheck`      | PRs, `main`, tags                |
-| Test             | `make test-coverage`                | PRs, `main`, tags                |
-| Build Image      | `docker build --target runtime ...` | `main` and tags                  |
-| Ingest           | Manual `RUN_INGESTION=true`         | Triggered via Jenkins parameters |
+| Stage            | Command / trigger                       | Notes                               |
+| ---------------- | --------------------------------------- | ----------------------------------- |
+| Lint + Typecheck | `make lint` + `make typecheck`          | PRs, `main`, tags                   |
+| Test             | `make test-coverage`                    | PRs, `main`, tags                   |
+| Ingest           | Manual `RUN_INGESTION=true`             | Parameterized Jenkins / Actions run |
+| Backup           | Manual `RUN_BACKUP=true` or post-ingest | Archives `outputs/backups/**`       |
+
+Live CI operations must stay manual and parameterized. Secret handling is owned by the CI system:
+
+- Jenkins credentials: `qdrant-url`, `qdrant-api-key-rw`, `openai-api-key`,
+  `kaggle-api-token`
+- GitHub Actions secrets: `QDRANT_URL`, `QDRANT_API_KEY_RW`, `OPENAI_API_KEY`,
+  `KAGGLE_API_TOKEN`
 
 ---
 
