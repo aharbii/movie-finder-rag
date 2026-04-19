@@ -4,18 +4,18 @@
 // Pipeline modes (Jenkins Multibranch Pipeline):
 //   PR build       — every pull request: Lint + Typecheck + Test (no image build)
 //   Main build     — push to main: Lint + Typecheck + Test (no image build)
-//   Manual ingest  — "Build with Parameters" with RUN_INGESTION=true:
-//                    Lint + Typecheck + Test + Ingest against production Qdrant
+//   Manual ops     — "Build with Parameters" with RUN_INGESTION/RUN_BACKUP=true:
+//                    Lint + Typecheck + Test + optional ingest/backup against live vector store
 //
 // NOTE: This image is NOT pushed to ACR. The rag pipeline is an offline
 // one-shot ingestion tool run manually. Only backend and frontend images are
 // published to ACR.
 //
 // Required Jenkins Credential IDs (see docs/devops-setup.md):
-//   qdrant-url           (Secret Text)   — Ingest stage only
-//   qdrant-api-key-rw    (Secret Text)   — Ingest stage only
-//   openai-api-key       (Secret Text)   — Ingest stage only
-//   kaggle-api-token     (Secret Text)   — Ingest stage only
+//   qdrant-url           (Secret Text)   — Manual ingest / backup only
+//   qdrant-api-key-rw    (Secret Text)   — Manual ingest / backup only
+//   openai-api-key       (Secret Text)   — Manual ingest only
+//   kaggle-api-token     (Secret Text)   — Manual ingest only
 //
 // Required Jenkins plugins: Docker Pipeline, JUnit, Coverage, Credentials Binding
 // =============================================================================
@@ -35,10 +35,20 @@ pipeline {
             defaultValue: false,
             description: 'Run the offline ingestion pipeline against Qdrant Cloud (requires live credentials).'
         )
+        booleanParam(
+            name: 'RUN_BACKUP',
+            defaultValue: false,
+            description: 'Run the backup utility against a live vector store and archive the local artifact.'
+        )
         string(
             name: 'COLLECTION_NAME',
             defaultValue: 'movies',
-            description: 'Qdrant collection name to write to. Defaults to "movies".'
+            description: 'Collection name to ingest and/or back up. Defaults to "movies".'
+        )
+        choice(
+            name: 'VECTOR_STORE',
+            choices: ['qdrant'],
+            description: 'Vector store type for the backup utility. Extend as new adapters are added.'
         )
     }
 
@@ -123,6 +133,34 @@ pipeline {
             }
         }
 
+        // ------------------------------------------------------------------ //
+        stage('Backup') {
+            when {
+                expression { params.RUN_BACKUP == true || params.RUN_INGESTION == true }
+            }
+            environment {
+                QDRANT_URL        = credentials('qdrant-url')
+                QDRANT_API_KEY_RW = credentials('qdrant-api-key-rw')
+            }
+            steps {
+                script {
+                    env.VECTOR_STORE = params.VECTOR_STORE ?: 'qdrant'
+                    env.BACKUP_COLLECTION_NAME = params.COLLECTION_NAME ?: 'movies'
+                    env.BACKUP_OUTPUT_ROOT = 'outputs/backups/chromadb'
+                    env.VECTOR_STORE_URL = env.QDRANT_URL
+                    env.VECTOR_STORE_API_KEY = env.QDRANT_API_KEY_RW
+                    echo "Backup source: ${env.VECTOR_STORE}"
+                    echo "Backup collection: ${env.BACKUP_COLLECTION_NAME}"
+                    sh 'make backup'
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'outputs/backups/**', allowEmptyArchive: true
+                }
+            }
+        }
+
     }
 
     post {
@@ -138,6 +176,9 @@ pipeline {
             script {
                 if (params.RUN_INGESTION) {
                     echo "Ingestion into '${env.QDRANT_COLLECTION_NAME}' completed successfully."
+                }
+                if (params.RUN_BACKUP || params.RUN_INGESTION) {
+                    echo "Backup artifact archived from outputs/backups/."
                 }
             }
         }

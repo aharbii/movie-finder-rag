@@ -6,11 +6,11 @@
 # to both Jenkinsfile and this file.
 #
 # Modes:
-#   Contribution   — PR + feature branches: Lint · Typecheck · Test
-#   Manual ingest  — workflow_dispatch with run_ingestion=true:
-#                    Lint · Typecheck · Test · Ingest against Qdrant Cloud
+#   Contribution   — PR + main pushes: Lint · Typecheck · Test
+#   Manual ops     — workflow_dispatch with run_ingestion/run_backup:
+#                    Lint · Typecheck · Test · optional ingest/backup against live vector store
 #
-# Required GitHub Actions secrets (for Ingest only):
+# Required GitHub Actions secrets (manual ops only):
 #   QDRANT_URL          Qdrant Cloud endpoint
 #   QDRANT_API_KEY_RW   Read-write API key
 #   OPENAI_API_KEY      For embedding model
@@ -31,10 +31,20 @@ on:
         type: boolean
         default: false
         description: Run the offline ingestion pipeline against Qdrant Cloud.
+      run_backup:
+        type: boolean
+        default: false
+        description: Run the backup utility against the configured live vector store.
+      vector_store:
+        type: choice
+        default: qdrant
+        options:
+          - qdrant
+        description: Vector store type for the backup utility.
       collection_name:
         type: string
         default: movies
-        description: Qdrant collection name to write to.
+        description: Collection name to ingest and/or back up.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -127,7 +137,7 @@ jobs:
     name: Ingest
     needs: [lint, typecheck, test]
     runs-on: ubuntu-latest
-    if: github.event.inputs.run_ingestion == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_ingestion == 'true'
     env:
       QDRANT_URL: ${{ secrets.QDRANT_URL }}
       QDRANT_API_KEY_RW: ${{ secrets.QDRANT_API_KEY_RW }}
@@ -150,4 +160,39 @@ jobs:
         with:
           name: ingestion-outputs
           path: ingestion-outputs.env
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------- #
+  backup:
+    name: Backup
+    needs: [lint, typecheck, test, ingest]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.run_backup == 'true' || github.event.inputs.run_ingestion == 'true') &&
+      (needs.ingest.result == 'success' || needs.ingest.result == 'skipped')
+    env:
+      VECTOR_STORE: ${{ github.event.inputs.vector_store || 'qdrant' }}
+      BACKUP_COLLECTION_NAME: ${{ github.event.inputs.collection_name || 'movies' }}
+      BACKUP_OUTPUT_ROOT: outputs/backups/chromadb
+      VECTOR_STORE_URL: ${{ secrets.QDRANT_URL }}
+      VECTOR_STORE_API_KEY: ${{ secrets.QDRANT_API_KEY_RW }}
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY_RW: ${{ secrets.QDRANT_API_KEY_RW }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize
+        run: make init
+
+      - name: Run backup
+        run: make backup
+
+      - name: Upload backup artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vector-store-backup
+          path: outputs/backups/
           if-no-files-found: ignore

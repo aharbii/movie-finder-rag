@@ -39,6 +39,7 @@ SOURCE_PATHS := .
 COVERAGE_XML ?= reports/coverage.xml
 COVERAGE_HTML ?= reports/htmlcov
 JUNIT_XML ?= reports/junit.xml
+BACKUP_ARGS ?=
 
 # ---------------------------------------------------------------------------
 # exec when running, run --rm otherwise — avoids container startup overhead
@@ -95,7 +96,7 @@ help:
 	@echo "    ingest         Run the one-shot ingestion pipeline against external Qdrant"
 	@echo ""
 	@echo "  Apps"
-	@echo "    backup         Creates a Backup for the Qdrant vector store in a local ChromaDB"
+	@echo "    backup         Runs the Docker-backed backup utility and writes artifacts under outputs/"
 	@echo "    retrieve       Runs an interactive app to validate the retrieval logic"
 	@echo ""
 
@@ -182,7 +183,7 @@ ingest:
 	$(COMPOSE) run --rm $(INGEST_SERVICE)
 
 backup:
-	$(call exec_or_run,python scripts/backup_vectorstore.py)
+	$(call exec_or_run,python scripts/backup_vectorstore.py $(BACKUP_ARGS))
 
 retrieve:
 	$(call exec_or_run,python scripts/retrieve.py)
