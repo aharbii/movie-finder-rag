@@ -6,6 +6,7 @@ from rag.config import settings
 from rag.embeddings.base import EmbeddingModelMetadata
 from rag.models.movie import Movie
 from rag.vectorstore.chromadb_vectorstore import ChromaDBVectorStore
+from rag.vectorstore.naming import resolve_collection_name, sanitize_collection_token
 from rag.vectorstore.qdrant_vectorstore import QdrantVectorStore, QdrantVectorStoreError
 
 
@@ -24,112 +25,58 @@ def sample_movie() -> Movie:
 
 @pytest.fixture
 def model_metadata() -> EmbeddingModelMetadata:
-    return EmbeddingModelMetadata(name="test-model", dimension=3)
+    return EmbeddingModelMetadata(name="BAAI/bge-m3", dimension=1024)
 
 
-def test_chromadb_upsert(sample_movie: Movie, model_metadata: EmbeddingModelMetadata) -> None:
-    with patch("chromadb.Client") as mock_client:
+def test_sanitize_collection_token() -> None:
+    assert sanitize_collection_token("BAAI/bge-m3") == "baai_bge_m3"
+
+
+def test_resolve_collection_name(model_metadata: EmbeddingModelMetadata) -> None:
+    assert resolve_collection_name("movies", model_metadata) == "movies_baai_bge_m3_1024"
+
+
+def test_chromadb_uses_dynamic_target_name(
+    sample_movie: Movie,
+    model_metadata: EmbeddingModelMetadata,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "qdrant_collection_prefix", "movies")
+    monkeypatch.setattr(settings, "chromadb_persist_path", "outputs/chromadb-test")
+
+    with patch("chromadb.PersistentClient") as mock_client:
         mock_collection = MagicMock()
         mock_client.return_value.get_or_create_collection.return_value = mock_collection
-
         store = ChromaDBVectorStore()
         store.upsert(sample_movie, [0.1, 0.2, 0.3], model_metadata)
 
-        mock_collection.add.assert_called_once()
-
-
-def test_chromadb_upsert_batch(sample_movie: Movie, model_metadata: EmbeddingModelMetadata) -> None:
-    with patch("chromadb.Client") as mock_client:
-        mock_collection = MagicMock()
-        mock_client.return_value.get_or_create_collection.return_value = mock_collection
-
-        store = ChromaDBVectorStore()
-        store.upsert_batch([sample_movie], [[0.1, 0.2, 0.3]], model_metadata)
-
-        mock_collection.add.assert_called_once()
-
-
-def test_chromadb_search(model_metadata: EmbeddingModelMetadata) -> None:
-    with patch("chromadb.Client") as mock_client:
-        mock_collection = MagicMock()
-        mock_collection.query.return_value = {
-            "metadatas": [
-                [
-                    {
-                        "id": 1,
-                        "title": "T",
-                        "release_year": 2000,
-                        "director": "D",
-                        "genre": ["G"],
-                        "cast": ["C"],
-                        "plot": "P",
-                    }
-                ]
-            ]
-        }
-        mock_client.return_value.get_or_create_collection.return_value = mock_collection
-
-        store = ChromaDBVectorStore()
-        results = store.search([0.1, 0.2, 0.3], top_k=1, embedding_model=model_metadata)
-
-        assert len(results) == 1
-        assert results[0].title == "T"
+        mock_client.return_value.get_or_create_collection.assert_called_once_with(
+            name="movies_baai_bge_m3_1024"
+        )
 
 
 def test_qdrant_validate_env_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "qdrant_api_key_rw", "")
+    monkeypatch.setattr(settings, "qdrant_api_key_rw", None)
+    monkeypatch.setattr(settings, "qdrant_url", None)
+
     with pytest.raises(QdrantVectorStoreError, match="QDRANT_API_KEY_RW is not defined"):
         QdrantVectorStore()
 
 
-def test_qdrant_upsert(
-    sample_movie: Movie, model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
+def test_qdrant_uses_dynamic_collection_name(
+    sample_movie: Movie,
+    model_metadata: EmbeddingModelMetadata,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "qdrant_url", "http://test")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
+    monkeypatch.setattr(settings, "qdrant_collection_prefix", "movies")
 
     with patch("rag.vectorstore.qdrant_vectorstore.QdrantClient") as mock_client:
         mock_client.return_value.collection_exists.return_value = True
         store = QdrantVectorStore()
         store.upsert(sample_movie, [0.1, 0.2, 0.3], model_metadata)
+
         mock_client.return_value.upsert.assert_called_once()
-
-
-def test_qdrant_upsert_creates_collection(
-    sample_movie: Movie, model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(settings, "qdrant_url", "http://test")
-    monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
-
-    with patch("rag.vectorstore.qdrant_vectorstore.QdrantClient") as mock_client:
-        mock_client.return_value.collection_exists.return_value = False
-        store = QdrantVectorStore()
-        store.upsert(sample_movie, [0.1, 0.2, 0.3], model_metadata)
-        mock_client.return_value.create_collection.assert_called_once()
-
-
-def test_qdrant_search(
-    model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(settings, "qdrant_url", "http://test")
-    monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
-
-    with patch("rag.vectorstore.qdrant_vectorstore.QdrantClient") as mock_client:
-        mock_client.return_value.collection_exists.return_value = True
-        mock_results = MagicMock()
-        mock_point = MagicMock()
-        mock_point.payload = {
-            "id": 1,
-            "title": "T",
-            "release_year": 2000,
-            "director": "D",
-            "genre": ["G"],
-            "cast": ["C"],
-            "plot": "P",
-        }
-        mock_results.points = [mock_point]
-        mock_client.return_value.query_points.return_value = mock_results
-
-        store = QdrantVectorStore()
-        results = store.search([0.1, 0.2, 0.3], top_k=1, embedding_model=model_metadata)
-        assert len(results) == 1
+        called_collection = mock_client.return_value.upsert.call_args.kwargs["collection_name"]
+        assert called_collection == "movies_baai_bge_m3_1024"

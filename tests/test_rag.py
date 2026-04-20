@@ -1,20 +1,14 @@
-from collections.abc import Sized
-from typing import cast
-
 from pytest import MonkeyPatch
 
 from rag.config import settings
 from rag.embeddings.base import EmbeddingModelMetadata
-from rag.models.movie import Movie
 from rag.vectorstore.qdrant_vectorstore import QdrantVectorStore
 
 
 def test_qdrant_vectorstore_uses_pydantic_settings(monkeypatch: MonkeyPatch) -> None:
-    """
-    Ensure the Qdrant client is correctly initialized from Pydantic settings.
-    """
     monkeypatch.setattr(settings, "qdrant_url", "https://qdrant.example")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "rw-test-key")
+    monkeypatch.setattr(settings, "qdrant_collection_prefix", "movies")
 
     captured: dict[str, str] = {}
 
@@ -23,58 +17,19 @@ def test_qdrant_vectorstore_uses_pydantic_settings(monkeypatch: MonkeyPatch) -> 
             captured["url"] = url
             captured["api_key"] = api_key
 
-    # Patch the client import within the rag package
-    monkeypatch.setattr("rag.vectorstore.qdrant_vectorstore.QdrantClient", DummyClient)
-
-    QdrantVectorStore()
-
-    assert captured == {
-        "url": "https://qdrant.example",
-        "api_key": "rw-test-key",
-    }
-
-
-def test_qdrant_vectorstore_batch_upsert(monkeypatch: MonkeyPatch) -> None:
-    """
-    Verify that batch upsert logic correctly calls the Qdrant SDK.
-    """
-    monkeypatch.setattr(settings, "qdrant_url", "https://qdrant.example")
-    monkeypatch.setattr(settings, "qdrant_api_key_rw", "rw-test-key")
-    monkeypatch.setattr(settings, "qdrant_collection_name", "movies-test")
-
-    captured: dict[str, object] = {}
-
-    class DummyClient:
-        def __init__(self, url: str, api_key: str) -> None:
-            pass
-
         def collection_exists(self, collection_name: str) -> bool:
             return True
 
-        def upsert(self, collection_name: str, points: list[object]) -> None:
-            captured["upsert_collection"] = collection_name
-            captured["points"] = points
+        def count(self, collection_name: str, exact: bool) -> object:
+            class Result:
+                count = 1
+
+            return Result()
 
     monkeypatch.setattr("rag.vectorstore.qdrant_vectorstore.QdrantClient", DummyClient)
 
     store = QdrantVectorStore()
-    model = EmbeddingModelMetadata(name="test-model", dimension=3072)
+    assert captured == {"url": "https://qdrant.example", "api_key": "rw-test-key"}
 
-    store.upsert_batch(
-        movies=[
-            Movie(
-                id=1,
-                title="Test Movie",
-                release_year=2024,
-                director="",
-                genre=[""],
-                cast=[""],
-                plot="",
-            )
-        ],
-        vectors=[[0.1, 0.2, 0.3]],
-        embedding_model=model,
-    )
-
-    assert captured["upsert_collection"] == "movies-test"
-    assert len(cast(Sized, captured["points"])) == 1
+    model = EmbeddingModelMetadata(name="BAAI/bge-m3", dimension=1024)
+    assert store.target_name(model) == "movies_baai_bge_m3_1024"

@@ -1,34 +1,32 @@
 import chromadb
 import numpy as np
 
+from rag.config import settings
 from rag.embeddings.base import EmbeddingModelMetadata
 from rag.models.movie import Movie
 from rag.utils.logger import get_logger
 from rag.vectorstore.base import VectorStore
+from rag.vectorstore.naming import resolve_collection_name
 
 
 class ChromaDBVectorStore(VectorStore):
-    """
-    Local vector store implementation using ChromaDB for developer use and backups.
-    """
+    """Local ChromaDB vector store implementation."""
 
     def __init__(self) -> None:
-        """Initialize the local ChromaDB client."""
         self.logger = get_logger(self.__class__.__name__)
-        self.client = chromadb.Client()
+        self.client = chromadb.PersistentClient(path=settings.chromadb_persist_path)
+
+    def target_name(self, embedding_model: EmbeddingModelMetadata) -> str:
+        return resolve_collection_name(settings.qdrant_collection_prefix, embedding_model)
+
+    def count(self, embedding_model: EmbeddingModelMetadata) -> int:
+        collection = self.client.get_or_create_collection(name=self.target_name(embedding_model))
+        return int(collection.count())
 
     def upsert(
         self, movie: Movie, vector: list[float], embedding_model: EmbeddingModelMetadata
     ) -> None:
-        """Upsert a single movie into the local ChromaDB collection."""
-        collection = self.client.get_or_create_collection(
-            name=embedding_model.name.replace("/", "-")
-        )
-        collection.add(
-            ids=[str(movie.id)],
-            embeddings=np.asarray(vector),
-            metadatas=[movie.model_dump()],
-        )
+        self.upsert_batch([movie], [vector], embedding_model)
 
     def upsert_batch(
         self,
@@ -36,14 +34,11 @@ class ChromaDBVectorStore(VectorStore):
         vectors: list[list[float]],
         embedding_model: EmbeddingModelMetadata,
     ) -> None:
-        """Upsert multiple movies into the local ChromaDB collection in a batch."""
-        collection = self.client.get_or_create_collection(
-            name=embedding_model.name.replace("/", "-")
-        )
-        collection.add(
-            ids=[str(m.id) for m in movies],
-            embeddings=np.asarray(vectors),
-            metadatas=[m.model_dump() for m in movies],
+        collection = self.client.get_or_create_collection(name=self.target_name(embedding_model))
+        collection.upsert(
+            ids=[str(movie.id) for movie in movies],
+            embeddings=np.asarray(vectors, dtype=np.float32),
+            metadatas=[movie.model_dump() for movie in movies],
         )
 
     def search(
@@ -52,14 +47,12 @@ class ChromaDBVectorStore(VectorStore):
         top_k: int,
         embedding_model: EmbeddingModelMetadata,
     ) -> list[Movie]:
-        """Perform a local vector search using ChromaDB."""
-        collection = self.client.get_or_create_collection(
-            name=embedding_model.name.replace("/", "-")
+        collection = self.client.get_or_create_collection(name=self.target_name(embedding_model))
+        results = collection.query(
+            query_embeddings=np.asarray([query_vector], dtype=np.float32),
+            n_results=top_k,
         )
-        results = collection.query(query_embeddings=np.asarray(query_vector), n_results=top_k)
-
-        movies = []
-        if results["metadatas"]:
-            for metadata in results["metadatas"][0]:
-                movies.append(Movie(**metadata))
-        return movies
+        metadatas = results.get("metadatas", [])
+        if not metadatas:
+            return []
+        return [Movie(**metadata) for metadata in metadatas[0] if metadata]

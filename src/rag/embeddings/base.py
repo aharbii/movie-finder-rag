@@ -4,10 +4,7 @@ from pydantic import BaseModel
 
 
 class EmbeddingModelMetadata(BaseModel):
-    """
-    Standardized metadata for any embedding model, regardless of provider.
-    Includes dimensions and pricing for cost tracking.
-    """
+    """Standardized metadata for any embedding model, regardless of provider."""
 
     name: str
     dimension: int
@@ -15,9 +12,7 @@ class EmbeddingModelMetadata(BaseModel):
 
 
 class EmbeddingModelUsage(BaseModel):
-    """
-    Usage statistics and estimated cost for an embedding run.
-    """
+    """Usage statistics and estimated cost for an embedding run."""
 
     prompt_tokens: int = 0
     total_tokens: int = 0
@@ -25,48 +20,21 @@ class EmbeddingModelUsage(BaseModel):
 
 
 class EmbeddingProvider(ABC):
-    """
-    Abstract base class for embedding providers (e.g., OpenAI, Gemini).
-    """
+    """Abstract base class for embedding providers."""
 
     @property
     @abstractmethod
     def model_info(self) -> EmbeddingModelMetadata:
         """Return standardized metadata about the current model."""
-        pass
 
     @abstractmethod
     def embed(self, text: str) -> list[float]:
-        """
-        Embed a single string of text into a vector.
-
-        Args:
-            text (str): The text string to embed.
-
-        Returns:
-            list[float]: The generated embedding vector.
-        """
-        pass
+        """Embed a single string of text into a vector."""
 
     @abstractmethod
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """
-        Embed a batch of strings into vectors.
-
-        Args:
-            texts (list[str]): The list of text strings to embed.
-
-        Returns:
-            list[list[float]]: The list of generated embedding vectors.
-        """
-        pass
+        """Embed a batch of strings into vectors."""
 
     @abstractmethod
     def get_model_usage(self) -> EmbeddingModelUsage:
-        """
-        Return the cumulative usage and cost for the current session.
-
-        Returns:
-            EmbeddingModelUsage: The usage statistics for the current provider instance.
-        """
-        pass
+        """Return the cumulative usage and cost for the current session."""

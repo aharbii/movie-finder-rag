@@ -7,7 +7,7 @@
 #
 # All developer commands execute through Docker Compose so linting, testing,
 # formatting, and pre-commit do not depend on a host-managed Python environment.
-# Qdrant is always external — no local Qdrant container is provided.
+# Remote vector stores stay external; local ChromaDB uses the mounted workspace path.
 #
 # Typical first-time flow:
 #   make init        # build images + create .env + install git hook
@@ -21,7 +21,7 @@
 .PHONY: help init build setup clean clean-docker \
 	editor-up editor-down ci-down shell logs up down  run run-dev \
 	lint format fix typecheck test test-coverage pre-commit detect-secrets check \
-	backup retrieve
+	backup retrieve validate
 
 
 .DEFAULT_GOAL := help
@@ -93,11 +93,12 @@ help:
 	@echo "    setup          Alias for init"
 	@echo ""
 	@echo "  Pipeline"
-	@echo "    ingest         Run the one-shot ingestion pipeline against external Qdrant"
+	@echo "    ingest         Run the one-shot ingestion pipeline against the configured vector store"
 	@echo ""
 	@echo "  Apps"
 	@echo "    backup         Runs the Docker-backed backup utility and writes artifacts under outputs/"
 	@echo "    retrieve       Runs an interactive app to validate the retrieval logic"
+	@echo "    validate       Runs the post-ingest validation script"
 	@echo ""
 
 init:
@@ -187,3 +188,6 @@ backup:
 
 retrieve:
 	$(call exec_or_run,python scripts/retrieve.py)
+
+validate:
+	$(call exec_or_run,python scripts/validate_ingestion.py)

@@ -64,6 +64,7 @@ def test_ingest_csv_success() -> None:
     """Test the full ingestion pipeline orchestration."""
     mock_provider = MagicMock()
     mock_provider.model_info.name = "test-model"
+    mock_provider.model_info.dimension = 3
     mock_provider.embed_batch.return_value = [[0.1, 0.2]]
 
     mock_usage = MagicMock()
@@ -72,6 +73,7 @@ def test_ingest_csv_success() -> None:
     mock_provider.get_model_usage.return_value = mock_usage
 
     mock_store = MagicMock()
+    mock_store.target_name.return_value = "movies_test_model_3"
 
     mock_movie = Movie(
         id=1,
@@ -94,6 +96,7 @@ def test_ingest_csv_no_movies() -> None:
     """Test pipeline when no movies are loaded."""
     mock_provider = MagicMock()
     mock_store = MagicMock()
+    mock_store.target_name.return_value = "movies_test_model_3"
 
     with patch("rag.ingestion.csv_loader.load_movies", return_value=[]):
         ingest_csv(mock_provider, mock_store)
@@ -104,6 +107,8 @@ def test_ingest_csv_no_movies() -> None:
 def test_ingest_csv_embedding_failure() -> None:
     """Test pipeline handling of embedding failures."""
     mock_provider = MagicMock()
+    mock_provider.model_info.name = "test-model"
+    mock_provider.model_info.dimension = 3
     mock_provider.embed_batch.return_value = []  # Failure
 
     mock_usage = MagicMock()
@@ -112,6 +117,7 @@ def test_ingest_csv_embedding_failure() -> None:
     mock_provider.get_model_usage.return_value = mock_usage
 
     mock_store = MagicMock()
+    mock_store.target_name.return_value = "movies_test_model_3"
 
     mock_movie = Movie(
         id=1,

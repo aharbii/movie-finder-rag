@@ -1,10 +1,5 @@
 # =============================================================================
 # movie-finder-rag — Docker-only local development and runtime images
-#
-# Targets:
-#   dev      Attached-container image used by docker-compose.yml and VS Code
-#   builder  Intermediate dependency synchronization stage
-#   runtime  One-shot ingestion image used by Jenkins and `make ingest`
 # =============================================================================
 
 FROM python:3.13-slim AS uv-base
@@ -16,8 +11,9 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy
 
 
-# ---- Stage 1: dev -----------------------------------------------------------
 FROM uv-base AS dev
+
+ARG WITH_PROVIDERS=""
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -37,26 +33,34 @@ ENV PATH="/opt/venv/bin:$PATH" \
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --all-groups --active --no-install-project --no-install-workspace
+    if [ -n "$WITH_PROVIDERS" ]; then \
+        uv sync --all-groups --extra "$WITH_PROVIDERS" --active --no-install-project --no-install-workspace; \
+    else \
+        uv sync --all-groups --active --no-install-project --no-install-workspace; \
+    fi
 
 CMD ["sleep", "infinity"]
 
 
-# ---- Stage 2: builder -------------------------------------------------------
 FROM uv-base AS builder
+
+ARG WITH_PROVIDERS=""
 
 WORKDIR /build
 
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project --no-install-workspace
+    if [ -n "$WITH_PROVIDERS" ]; then \
+        uv sync --frozen --no-dev --extra "$WITH_PROVIDERS" --no-install-project --no-install-workspace; \
+    else \
+        uv sync --frozen --no-dev --no-install-project --no-install-workspace; \
+    fi
 
 COPY src/ src/
 COPY scripts/ scripts/
 
 
-# ---- Stage 3: runtime -------------------------------------------------------
 FROM python:3.13-slim AS runtime
 
 LABEL org.opencontainers.image.title="movie-finder-rag"
