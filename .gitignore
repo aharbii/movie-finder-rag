@@ -44,3 +44,4 @@ chroma/
 # OS
 .DS_Store
 Thumbs.db
+.gitdir
