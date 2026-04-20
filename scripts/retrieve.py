@@ -35,7 +35,9 @@ def interactive_retrieve() -> None:
             print("⏳ Embedding query and searching...")
             query_vector = provider.embed(query)
             if not query_vector:
-                print("❌ Failed to generate embedding. Check provider credentials or local runtime.")
+                print(
+                    "❌ Failed to generate embedding. Check provider credentials or local runtime."
+                )
                 continue
 
             results = store.search(query_vector, top_k=5, embedding_model=model_info)
