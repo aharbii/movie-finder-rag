@@ -4,7 +4,7 @@ Shared reference for AI agents working in this repo standalone.
 
 ## Available slash commands (Claude Code)
 
-Open `backend/rag_ingestion/` as your workspace, then type `/`:
+Open `rag/` as your workspace, then type `/`:
 
 | Command                     | Usage                             |
 | --------------------------- | --------------------------------- |
