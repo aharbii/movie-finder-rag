@@ -38,8 +38,6 @@
 // Required Jenkins plugins: Docker Pipeline, JUnit, Coverage, Credentials Binding
 // =============================================================================
 
-def pipelineEligibility = null
-
 pipeline {
     agent any
 
@@ -329,17 +327,22 @@ pipeline {
 
 // -------------------------------------------------------------------------- //
 def shouldRunPipeline() {
-    if (pipelineEligibility != null) {
-        return pipelineEligibility
+    if (env.RAG_CI_ELIGIBLE?.trim()) {
+        return env.RAG_CI_ELIGIBLE == 'true'
     }
 
+    def eligible = resolvePipelineEligibility()
+    env.RAG_CI_ELIGIBLE = eligible.toString()
+    return eligible
+}
+
+// -------------------------------------------------------------------------- //
+def resolvePipelineEligibility() {
     if (env.CHANGE_ID) {
-        pipelineEligibility = !isDraftPullRequest()
-        return pipelineEligibility
+        return !isDraftPullRequest()
     }
 
-    pipelineEligibility = env.BRANCH_NAME == 'main'
-    return pipelineEligibility
+    return env.BRANCH_NAME == 'main'
 }
 
 // -------------------------------------------------------------------------- //
