@@ -4,21 +4,25 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from functools import partial
 from typing import Any
 
+from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.command import Hit, Hits, Provider
 from textual.containers import ScrollableContainer, Vertical
 from textual.reactive import reactive
-from textual.widgets import Button, Footer, Header, Label, Static, TextArea
+from textual.widgets import Button, Footer, Header, Label, OptionList, Static, TextArea
 
 from rag.config import DEFAULT_EMBEDDING_MODELS, EmbeddingProviderName, VectorStoreName
 from rag.embeddings.factory import create_embedding_provider
 from rag.models.movie import Movie
 from rag.tui.constants import (
     BACKUP_BUTTON_ID,
-    COMMAND_HELP,
+    COMMAND_REGISTRY,
+    COMPLETION_LIST_ID,
     MESSAGE_BAR_ID,
     PROVIDER_NAMES,
     RESULTS_LIST_ID,
@@ -28,19 +32,72 @@ from rag.tui.constants import (
     VECTOR_STORE_NAMES,
     VECTOR_STORES,
 )
-from rag.tui.widgets import MovieCard, SettingsBar
+from rag.tui.widgets import ConfigBar, MovieCard
 from rag.vectorstore.factory import create_vector_store
 
 logger = logging.getLogger(__name__)
 
-_CSS = """
-Screen {
-    layout: vertical;
-}
+# ---------------------------------------------------------------------------
+# Textual CommandPalette provider (Ctrl+P)
+# ---------------------------------------------------------------------------
 
+_HELP_TEXT = """\
+[bold]Movie Finder RAG — Retrieval TUI[/bold]
+
+[dim]Search:[/dim]  Type a query and press [bold]Ctrl+S[/bold] or the Search button.
+
+[dim]Settings:[/dim]
+  Type [bold]/[/bold] in the search box → completion list appears
+  Press [bold]↓[/bold] to enter the list, [bold]↑↓[/bold] to navigate, [bold]Enter[/bold] to apply
+  Press [bold]Esc[/bold] to dismiss  ·  [bold]Ctrl+P[/bold] for the full command palette
+
+  Available settings and actions are listed below as you type.
+  You never need to type a value manually — just select from the list.
+
+[dim]Keys:[/dim]  Ctrl+S search  ·  Ctrl+P palette  ·  Ctrl+B backup  ·  Ctrl+L clear  ·  Ctrl+Q quit\
+"""
+
+
+class RAGCommandProvider(Provider):
+    """Supplies all setting-change commands to the Textual CommandPalette."""
+
+    async def discover(self) -> Hits:
+        app: RetrievalApp = self.app  # type: ignore[assignment]
+        for cmd_id, name, description in COMMAND_REGISTRY:
+            yield self._make_hit(app, cmd_id, name, description)
+
+    async def search(self, query: str) -> Hits:
+        app: RetrievalApp = self.app  # type: ignore[assignment]
+        matcher = self.matcher(query)
+        for cmd_id, name, description in COMMAND_REGISTRY:
+            score = matcher.match(f"{name} {description}")
+            if score > 0:
+                yield Hit(
+                    score=score,
+                    match_display=matcher.highlight(name),
+                    command=partial(app._dispatch_command_id, cmd_id),
+                    text=name,
+                    help=description,
+                )
+
+    @staticmethod
+    def _make_hit(app: RetrievalApp, cmd_id: str, name: str, description: str) -> Hit:
+        return Hit(
+            score=0,
+            match_display=name,
+            command=partial(app._dispatch_command_id, cmd_id),
+            text=name,
+            help=description,
+        )
+
+
+# ---------------------------------------------------------------------------
+# App CSS — layout only, no color overrides; uses Textual's default theme
+# ---------------------------------------------------------------------------
+
+_CSS = """
 #results-scroll {
     height: 1fr;
-    border-bottom: solid $primary-darken-3;
 }
 
 #results-list {
@@ -49,21 +106,21 @@ Screen {
 }
 
 .movie-card {
-    border: round $primary-darken-2;
+    border: round $primary;
     padding: 0 1;
     margin-bottom: 1;
 }
 
-.movie-card:hover {
-    border: round $accent;
-    background: $surface-lighten-1;
+#completion-list {
+    height: auto;
+    max-height: 12;
+    display: none;
 }
 
-#input-area {
+#input-row {
     height: auto;
     max-height: 10;
     padding: 0 1;
-    background: $surface;
     border-top: solid $primary;
     layout: horizontal;
     align: left middle;
@@ -76,35 +133,26 @@ Screen {
     margin-right: 1;
 }
 
-#button-col {
-    width: 14;
+#btn-col {
+    width: 12;
     height: auto;
     layout: vertical;
+    align: center top;
 }
 
-#search-button {
-    width: 100%;
-    margin-bottom: 1;
-}
-
-#backup-button {
-    width: 100%;
-}
-
-#settings-bar {
-    height: 1;
-    padding: 0 2;
-    background: $panel;
-    border-top: solid $primary-darken-3;
-}
+#search-button { width: 100%; margin-bottom: 1; }
+#backup-button { width: 100%; }
 
 #message-bar {
     height: 1;
-    padding: 0 2;
-    background: $surface;
+    padding: 0 1;
     color: $text-muted;
 }
 """
+
+# ---------------------------------------------------------------------------
+# Main application
+# ---------------------------------------------------------------------------
 
 
 class RetrievalApp(App[None]):
@@ -112,12 +160,16 @@ class RetrievalApp(App[None]):
 
     TITLE = "Movie Finder RAG — Retrieval TUI"
     CSS = _CSS
+    COMMANDS = {RAGCommandProvider}
 
     BINDINGS = [
-        Binding("ctrl+s", "search", "Search", show=True),
-        Binding("ctrl+b", "backup", "Backup", show=True),
-        Binding("ctrl+l", "clear_results", "Clear", show=True),
-        Binding("ctrl+c", "quit", "Quit", show=True),
+        Binding("ctrl+s", "search", "Search"),
+        Binding("ctrl+p", "command_palette", "Commands"),
+        Binding("ctrl+b", "backup", "Backup"),
+        Binding("ctrl+l", "clear_results", "Clear"),
+        Binding("ctrl+q", "quit", "Quit"),
+        Binding("escape", "dismiss_completion", "Dismiss", show=False),
+        Binding("down", "focus_completion", "↓ complete", show=False),
     ]
 
     _provider: reactive[EmbeddingProviderName] = reactive("openai")
@@ -126,14 +178,11 @@ class RetrievalApp(App[None]):
     _top_k: reactive[int] = reactive(5)
 
     def compose(self) -> ComposeResult:
-        """Build the TUI widget tree."""
         yield Header()
         with ScrollableContainer(id="results-scroll"), Vertical(id=RESULTS_LIST_ID):
-            yield Static(
-                COMMAND_HELP,
-                id="placeholder-msg",
-            )
-        with Vertical(id="input-area"):
+            yield Static(_HELP_TEXT, id="help-msg")
+        yield OptionList(id=COMPLETION_LIST_ID)
+        with Vertical(id="input-row"):
             yield TextArea(
                 id=SEARCH_INPUT_ID,
                 language=None,
@@ -141,34 +190,36 @@ class RetrievalApp(App[None]):
                 tab_behavior="focus",
                 soft_wrap=True,
             )
-            with Vertical(id="button-col"):
+            with Vertical(id="btn-col"):
                 yield Button("Search", id=SEARCH_BUTTON_ID, variant="primary")
                 yield Button("Backup", id=BACKUP_BUTTON_ID, variant="warning")
-        yield SettingsBar()
+        yield ConfigBar()
         yield Label("", id=MESSAGE_BAR_ID)
         yield Footer()
 
+    def on_mount(self) -> None:
+        self.query_one(f"#{SEARCH_INPUT_ID}", TextArea).focus()
+
     # ------------------------------------------------------------------
-    # Reactive watchers — keep settings bar in sync
+    # Reactive watchers
     # ------------------------------------------------------------------
 
     def watch__provider(self, value: EmbeddingProviderName) -> None:
-        """Sync model default and refresh settings bar when provider changes."""
         self._model = DEFAULT_EMBEDDING_MODELS[value]
-        self._refresh_settings_bar()
+        self._sync_config_bar()
 
     def watch__model(self, _: str) -> None:
-        self._refresh_settings_bar()
+        self._sync_config_bar()
 
     def watch__vector_store(self, _: VectorStoreName) -> None:
-        self._refresh_settings_bar()
+        self._sync_config_bar()
 
     def watch__top_k(self, _: int) -> None:
-        self._refresh_settings_bar()
+        self._sync_config_bar()
 
-    def _refresh_settings_bar(self) -> None:
+    def _sync_config_bar(self) -> None:
         with contextlib.suppress(Exception):
-            self.query_one(SettingsBar).update_settings(
+            self.query_one(ConfigBar).refresh_config(
                 self._provider, self._model, self._vector_store, self._top_k
             )
 
@@ -181,6 +232,50 @@ class RetrievalApp(App[None]):
         """Return (label, value) model options for the given provider."""
         default = DEFAULT_EMBEDDING_MODELS[provider]
         return [(default, default)]
+
+    # ------------------------------------------------------------------
+    # Inline completion — triggered by TextArea.Changed
+    # ------------------------------------------------------------------
+
+    @on(TextArea.Changed, f"#{SEARCH_INPUT_ID}")
+    def on_search_changed(self, event: TextArea.Changed) -> None:
+        text = event.text_area.text
+        completion = self.query_one(f"#{COMPLETION_LIST_ID}", OptionList)
+        if text.startswith("/"):
+            needle = text.lower()
+            completion.clear_options()
+            for cmd_id, name, description in COMMAND_REGISTRY:
+                if needle in name or needle in description.lower():
+                    line = Text()
+                    line.append(f"{name:<35}", style="bold")
+                    line.append(description, style="dim")
+                    completion.add_option(OptionList.Option(line, id=cmd_id))  # type: ignore[attr-defined]
+            completion.display = completion.option_count > 0
+        else:
+            completion.display = False
+
+    @on(OptionList.OptionSelected, f"#{COMPLETION_LIST_ID}")
+    def on_completion_selected(self, event: OptionList.OptionSelected) -> None:
+        cmd_id = str(event.option_id)
+        self._dispatch_command_id(cmd_id)
+        self.query_one(f"#{SEARCH_INPUT_ID}", TextArea).clear()
+        self.query_one(f"#{COMPLETION_LIST_ID}", OptionList).display = False
+        self.query_one(f"#{SEARCH_INPUT_ID}", TextArea).focus()
+
+    # ------------------------------------------------------------------
+    # Keyboard actions
+    # ------------------------------------------------------------------
+
+    def action_focus_completion(self) -> None:
+        """Move focus into the completion list when it is visible (Down key)."""
+        completion = self.query_one(f"#{COMPLETION_LIST_ID}", OptionList)
+        if completion.display:
+            completion.focus()
+
+    def action_dismiss_completion(self) -> None:
+        """Hide the completion list and return focus to the search input."""
+        self.query_one(f"#{COMPLETION_LIST_ID}", OptionList).display = False
+        self.query_one(f"#{SEARCH_INPUT_ID}", TextArea).focus()
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -199,14 +294,14 @@ class RetrievalApp(App[None]):
     # ------------------------------------------------------------------
 
     def action_search(self) -> None:
-        """Read the query, dispatch slash commands or kick off search."""
+        """Execute search or dispatch slash command from the input box."""
         text_area = self.query_one(f"#{SEARCH_INPUT_ID}", TextArea)
         query = text_area.text.strip()
         if not query:
-            self._set_message("[yellow]Enter a query or /help for commands.[/yellow]")
+            self._set_message("Enter a query — or / for commands, Ctrl+P for palette")
             return
         if query.startswith("/"):
-            self._handle_command(query)
+            self._dispatch_slash(query)
             text_area.clear()
         else:
             self._run_search(query)
@@ -215,82 +310,93 @@ class RetrievalApp(App[None]):
         self._run_backup()
 
     def action_clear_results(self) -> None:
-        """Clear the results panel."""
         self._clear_results()
-        self._set_message("[dim]Results cleared.[/dim]")
+        self._set_message("Results cleared.")
 
     # ------------------------------------------------------------------
-    # Slash command dispatcher
+    # Slash / command-id dispatch
     # ------------------------------------------------------------------
 
-    def _handle_command(self, raw: str) -> None:
-        """Parse and execute a slash command entered in the search field."""
+    def _dispatch_slash(self, raw: str) -> None:
+        """Dispatch a slash command — exact registry match, then special cases."""
+        raw = raw.strip()
+        # Exact match in registry (e.g. "/provider openai", "/store qdrant")
+        for cmd_id, name, _ in COMMAND_REGISTRY:
+            if raw == name:
+                self._dispatch_command_id(cmd_id)
+                return
+        # Special cases not in the registry
         parts = raw.split(None, 1)
         cmd = parts[0].lower()
         arg = parts[1].strip() if len(parts) > 1 else ""
-
         match cmd:
-            case "/help" | "/?":
-                self._show_help()
-            case "/clear":
-                self.action_clear_results()
-            case "/provider" | "/p":
-                self._cmd_provider(arg)
             case "/model" | "/m":
-                self._cmd_model(arg)
-            case "/store" | "/s":
-                self._cmd_store(arg)
-            case "/topk" | "/k":
-                self._cmd_topk(arg)
+                self._do_model(arg)
+            case "/quit" | "/q" | "/exit":
+                self.exit()
             case _:
-                self._set_message(
-                    f"[red]Unknown command: {cmd}  — type /help for available commands[/red]"
-                )
+                self._set_message(f"Unknown: {raw!r}  — type / and press ↓ to browse, or Ctrl+P")
 
-    def _cmd_provider(self, arg: str) -> None:
+    def _dispatch_command_id(self, cmd_id: str) -> None:
+        """Execute a command by its registry ID (used by CommandPalette and completion)."""
+        kind, _, value = cmd_id.partition(":")
+        match kind:
+            case "provider":
+                self._do_provider(value)
+            case "store":
+                self._do_store(value)
+            case "topk":
+                self._do_topk(value)
+            case "action":
+                match value:
+                    case "clear":
+                        self.action_clear_results()
+                    case "help":
+                        self._show_help()
+                    case "quit":
+                        self.exit()
+
+    def _do_provider(self, arg: str) -> None:
         if arg not in PROVIDER_NAMES:
             self._set_message(
-                f"[red]Unknown provider: {arg!r}  Valid: {', '.join(sorted(PROVIDER_NAMES))}[/red]"
+                f"Unknown provider: {arg!r}  Valid: {', '.join(sorted(PROVIDER_NAMES))}"
             )
             return
         self._provider = arg  # type: ignore[assignment]
-        self._set_message(f"[green]Provider → {arg}[/green]")
+        self._set_message(f"provider → {arg}")
 
-    def _cmd_model(self, arg: str) -> None:
+    def _do_model(self, arg: str) -> None:
         if not arg:
-            self._set_message("[red]/model requires a model name[/red]")
+            self._set_message("/model requires a model name")
             return
         self._model = arg
-        self._set_message(f"[green]Model → {arg}[/green]")
+        self._set_message(f"model → {arg}")
 
-    def _cmd_store(self, arg: str) -> None:
+    def _do_store(self, arg: str) -> None:
         if arg not in VECTOR_STORE_NAMES:
             self._set_message(
-                f"[red]Unknown store: {arg!r}  "
-                f"Valid: {', '.join(v for _, v in VECTOR_STORES)}[/red]"
+                f"Unknown store: {arg!r}  Valid: {', '.join(v for _, v in VECTOR_STORES)}"
             )
             return
         self._vector_store = arg  # type: ignore[assignment]
-        self._set_message(f"[green]Store → {arg}[/green]")
+        self._set_message(f"store → {arg}")
 
-    def _cmd_topk(self, arg: str) -> None:
+    def _do_topk(self, arg: str) -> None:
         try:
             n = int(arg)
         except ValueError:
-            self._set_message(f"[red]/topk requires an integer, got: {arg!r}[/red]")
+            self._set_message(f"/topk requires an integer, got: {arg!r}")
             return
         if n not in TOP_K_VALUES:
-            self._set_message(f"[red]top-k must be one of {sorted(TOP_K_VALUES)}, got {n}[/red]")
+            self._set_message(f"top-k must be one of {sorted(TOP_K_VALUES)}, got {n}")
             return
         self._top_k = n
-        self._set_message(f"[green]top-k → {n}[/green]")
+        self._set_message(f"top-k → {n}")
 
     def _show_help(self) -> None:
+        self._clear_results()
         results_panel = self.query_one(f"#{RESULTS_LIST_ID}", Vertical)
-        for child in list(results_panel.children):
-            child.remove()
-        results_panel.mount(Static(COMMAND_HELP, id="help-msg"))
-        self._set_message("[dim]/help — command reference[/dim]")
+        results_panel.mount(Static(_HELP_TEXT))
 
     # ------------------------------------------------------------------
     # Background workers
@@ -298,42 +404,30 @@ class RetrievalApp(App[None]):
 
     @work(exclusive=True, thread=True)
     def _run_search(self, query: str) -> None:
-        """Embed the query and search the vector store in a background thread."""
         self.call_from_thread(self._set_searching_state, True)
         try:
             self.call_from_thread(
                 self._set_message,
-                f"[cyan]Searching  provider={self._provider}  "
-                f"store={self._vector_store}  k={self._top_k}…[/cyan]",
+                f"Searching  provider={self._provider}  store={self._vector_store}  k={self._top_k}…",
             )
-            provider = create_embedding_provider(
-                provider_name=self._provider,
-                model=self._model,
-            )
+            provider = create_embedding_provider(provider_name=self._provider, model=self._model)
             store = create_vector_store(vector_store_name=self._vector_store)
             model_info = provider.model_info
             vector = provider.embed(query)
             if not vector:
-                self.call_from_thread(
-                    self._set_message,
-                    "[red]Embedding failed — check provider credentials.[/red]",
-                )
+                self.call_from_thread(self._set_message, "Embedding failed — check credentials.")
                 return
             results = store.search(vector, top_k=self._top_k, embedding_model=model_info)
             self.call_from_thread(self._display_results, results, query)
         except Exception as exc:
             logger.exception("Search worker error")
-            self.call_from_thread(self._set_message, f"[red]Error: {exc}[/red]")
+            self.call_from_thread(self._set_message, f"Error: {exc}")
         finally:
             self.call_from_thread(self._set_searching_state, False)
 
     @work(exclusive=True, thread=True)
     def _run_backup(self) -> None:
-        """Run the vector store backup in a background thread."""
-        self.call_from_thread(
-            self._set_message,
-            f"[yellow]Starting backup  store={self._vector_store}…[/yellow]",
-        )
+        self.call_from_thread(self._set_message, f"Starting backup  store={self._vector_store}…")
         try:
             from backup_vectorstore import BackupConfig, backup_vector_store
             from rag.config import settings
@@ -341,11 +435,9 @@ class RetrievalApp(App[None]):
             provider = create_embedding_provider(provider_name=self._provider, model=self._model)
             store = create_vector_store(vector_store_name=self._vector_store)
             model_info = provider.model_info
-            collection_name = store.target_name(model_info)
-
             config = BackupConfig(
                 vector_store=self._vector_store,
-                collection_name=collection_name,
+                collection_name=store.target_name(model_info),
                 output_root=__import__("pathlib").Path("outputs/backups"),
                 batch_size=settings.batch_size,
                 embedding_provider=self._provider,
@@ -362,25 +454,22 @@ class RetrievalApp(App[None]):
             stats = backup_vector_store(config)
             self.call_from_thread(
                 self._set_message,
-                f"[green]Backup complete: {stats.local_points} points → {stats.output_path}[/green]",
+                f"Backup complete: {stats.local_points} points → {stats.output_path}",
             )
         except Exception as exc:
             logger.exception("Backup worker error")
-            self.call_from_thread(self._set_message, f"[red]Backup failed: {exc}[/red]")
+            self.call_from_thread(self._set_message, f"Backup failed: {exc}")
 
     # ------------------------------------------------------------------
-    # UI state helpers (main thread only)
+    # UI helpers (main thread only)
     # ------------------------------------------------------------------
 
     def _set_message(self, message: str) -> None:
-        """Update the single-line message bar."""
         self.query_one(f"#{MESSAGE_BAR_ID}", Label).update(message)
 
     def _set_searching_state(self, searching: bool) -> None:
-        search_btn = self.query_one(f"#{SEARCH_BUTTON_ID}", Button)
-        backup_btn = self.query_one(f"#{BACKUP_BUTTON_ID}", Button)
-        search_btn.disabled = searching
-        backup_btn.disabled = searching
+        self.query_one(f"#{SEARCH_BUTTON_ID}", Button).disabled = searching
+        self.query_one(f"#{BACKUP_BUTTON_ID}", Button).disabled = searching
 
     def _clear_results(self) -> None:
         results_panel = self.query_one(f"#{RESULTS_LIST_ID}", Vertical)
@@ -388,17 +477,12 @@ class RetrievalApp(App[None]):
             child.remove()
 
     def _display_results(self, results: list[Movie], query: str) -> None:
-        """Replace the results panel contents with fresh movie cards."""
         self._clear_results()
         results_panel = self.query_one(f"#{RESULTS_LIST_ID}", Vertical)
-
         if not results:
-            results_panel.mount(Static("[dim]No results found.[/dim]"))
-            self._set_message(f"[yellow]No results for: [italic]{query[:80]}[/italic][/yellow]")
+            results_panel.mount(Static("No results found."))
+            self._set_message(f"No results for: {query[:80]}")
             return
-
         cards: list[Any] = [MovieCard(i, movie) for i, movie in enumerate(results, start=1)]
         results_panel.mount(*cards)
-        self._set_message(
-            f"[green]{len(results)} result(s) for: [italic]{query[:80]}[/italic][/green]"
-        )
+        self._set_message(f"{len(results)} result(s) for: {query[:80]}")

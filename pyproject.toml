@@ -88,6 +88,11 @@ warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
 
 
+[[tool.mypy.overrides]]
+module = ["rag.tui.*"]
+warn_unused_ignores = false
+
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

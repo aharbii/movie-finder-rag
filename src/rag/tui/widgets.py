@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from textual.app import RenderResult
 from textual.widgets import Static
 
 from rag.config import DEFAULT_EMBEDDING_MODELS, EmbeddingProviderName, VectorStoreName
@@ -13,20 +12,20 @@ class MovieCard(Static):
     """A formatted card displaying one search result."""
 
     def __init__(self, index: int, movie: Movie, score: float | None = None) -> None:
-        score_str = f" — score: {score:.4f}" if score is not None else ""
+        score_str = f"  score {score:.4f}" if score is not None else ""
         cast_preview = ", ".join(movie.cast[:5])
         if len(movie.cast) > 5:
-            cast_preview += "..."
+            cast_preview += "…"
         plot_preview = movie.plot[:200]
         if len(movie.plot) > 200:
-            plot_preview += "..."
+            plot_preview += "…"
         content = (
-            f"[bold cyan]{index}. {movie.title}[/bold cyan] "
-            f"[dim]({movie.release_year}){score_str}[/dim]\n"
-            f"[yellow]Director:[/yellow] {movie.director}   "
-            f"[yellow]Genre:[/yellow] {', '.join(movie.genre)}\n"
-            f"[yellow]Cast:[/yellow] {cast_preview}\n"
-            f"[dim]{plot_preview}[/dim]"
+            f"[bold]{index}. {movie.title}[/bold]"
+            f"  [dim]{movie.release_year}{score_str}[/dim]\n"
+            f"[dim]Director:[/dim] {movie.director}   "
+            f"[dim]Genre:[/dim] {', '.join(movie.genre)}\n"
+            f"[dim]Cast:[/dim] {cast_preview}\n"
+            f"{plot_preview}"
         )
         super().__init__(content, classes="movie-card")
         self._movie = movie
@@ -44,38 +43,43 @@ class MovieCard(Static):
         return self._card_content
 
 
-class SettingsBar(Static):
-    """One-line status bar showing the active TUI configuration."""
+class ConfigBar(Static):
+    """One-line bar showing the active TUI configuration."""
+
+    DEFAULT_CSS = """
+    ConfigBar {
+        height: 1;
+        padding: 0 1;
+        background: $panel;
+        dock: bottom;
+    }
+    """
 
     def __init__(self) -> None:
-        super().__init__("", id="settings-bar")
+        super().__init__("", id="config-bar")
         self._provider: EmbeddingProviderName = "openai"
         self._model: str = DEFAULT_EMBEDDING_MODELS["openai"]
         self._store: VectorStoreName = "qdrant"
         self._top_k: int = 5
 
-    def update_settings(
+    def refresh_config(
         self,
         provider: EmbeddingProviderName,
         model: str,
         store: VectorStoreName,
         top_k: int,
     ) -> None:
-        """Refresh the bar whenever a setting changes."""
+        """Redraw whenever a setting changes."""
         self._provider = provider
         self._model = model
         self._store = store
         self._top_k = top_k
-        self.update(self._render_line())
+        self.update(self._line())
 
-    def render(self) -> RenderResult:
-        """Initial render."""
-        return self._render_line()
-
-    def _render_line(self) -> str:
+    def _line(self) -> str:
         return (
-            f"[dim]provider=[/dim][cyan]{self._provider}[/cyan]  "
-            f"[dim]model=[/dim][cyan]{self._model}[/cyan]  "
-            f"[dim]store=[/dim][cyan]{self._store}[/cyan]  "
-            f"[dim]top-k=[/dim][cyan]{self._top_k}[/cyan]"
+            f"provider=[bold]{self._provider}[/bold]  "
+            f"model=[bold]{self._model}[/bold]  "
+            f"store=[bold]{self._store}[/bold]  "
+            f"top-k=[bold]{self._top_k}[/bold]"
         )

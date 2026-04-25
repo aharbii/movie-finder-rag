@@ -1,4 +1,4 @@
-"""Compile-time constants, widget IDs, and slash-command help for the Retrieval TUI."""
+"""Compile-time constants and widget IDs for the Retrieval TUI."""
 
 from __future__ import annotations
 
@@ -36,20 +36,24 @@ SEARCH_INPUT_ID = "search-input"
 SEARCH_BUTTON_ID = "search-button"
 BACKUP_BUTTON_ID = "backup-button"
 RESULTS_LIST_ID = "results-list"
-SETTINGS_BAR_ID = "settings-bar"
+COMPLETION_LIST_ID = "completion-list"
+CONFIG_BAR_ID = "config-bar"
 MESSAGE_BAR_ID = "message-bar"
 
-COMMAND_HELP = """\
-[bold]Slash commands[/bold]
-
-  [cyan]/provider[/cyan] <name>   Set embedding provider
-                  [dim]openai · ollama · huggingface · sentence-transformers · google[/dim]
-  [cyan]/model[/cyan] <name>      Set embedding model (must match provider)
-  [cyan]/store[/cyan] <name>      Set vector store backend
-                  [dim]qdrant · chromadb · pinecone · pgvector[/dim]
-  [cyan]/topk[/cyan] <n>          Set number of results  [dim](3 · 5 · 10 · 15 · 20)[/dim]
-  [cyan]/clear[/cyan]             Clear the results panel
-  [cyan]/help[/cyan]              Show this message
-
-[dim]Any other text runs a semantic search.[/dim]\
-"""
+# Registry: (command_id, display_name, description)
+# command_id format: "type:value"
+COMMAND_REGISTRY: list[tuple[str, str, str]] = [
+    # --- providers ---
+    *[(f"provider:{v}", f"/provider {v}", f"Set embedding provider → {v}") for _, v in PROVIDERS],
+    # --- vector stores ---
+    *[
+        (f"store:{v}", f"/store {v}", f"Use {label} as the vector store backend")
+        for label, v in VECTOR_STORES
+    ],
+    # --- top-k ---
+    *[(f"topk:{v}", f"/topk {v}", f"Return {v} results per search") for _, v in TOP_K_OPTIONS],
+    # --- actions ---
+    ("action:clear", "/clear", "Clear the results panel"),
+    ("action:help", "/help", "Show command reference"),
+    ("action:quit", "/quit", "Exit the app"),
+]

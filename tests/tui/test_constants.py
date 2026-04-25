@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from rag.tui.constants import (
-    COMMAND_HELP,
+    COMMAND_REGISTRY,
     PROVIDER_NAMES,
     PROVIDERS,
     TOP_K_OPTIONS,
@@ -45,6 +45,24 @@ def test_providers_values_are_valid_provider_names() -> None:
         assert value in valid
 
 
-def test_command_help_contains_key_commands() -> None:
-    for cmd in ("/provider", "/store", "/topk", "/model", "/clear", "/help"):
-        assert cmd in COMMAND_HELP
+def test_command_registry_has_all_providers() -> None:
+    registry_names = {name for _, name, _ in COMMAND_REGISTRY}
+    for _, provider in PROVIDERS:
+        assert f"/provider {provider}" in registry_names
+
+
+def test_command_registry_has_all_stores() -> None:
+    registry_names = {name for _, name, _ in COMMAND_REGISTRY}
+    for _, store in VECTOR_STORES:
+        assert f"/store {store}" in registry_names
+
+
+def test_command_registry_has_quit_and_help() -> None:
+    registry_names = {name for _, name, _ in COMMAND_REGISTRY}
+    assert "/quit" in registry_names
+    assert "/help" in registry_names
+
+
+def test_command_registry_ids_are_unique() -> None:
+    ids = [cmd_id for cmd_id, _, _ in COMMAND_REGISTRY]
+    assert len(ids) == len(set(ids))
