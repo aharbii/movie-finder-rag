@@ -21,7 +21,7 @@
 .PHONY: help init build setup clean clean-docker \
 	editor-up editor-down ci-down shell logs up down  run run-dev \
 	lint format fix typecheck test test-coverage pre-commit detect-secrets check \
-	backup retrieve validate
+	backup retrieve validate migrate-legacy-qdrant-collection
 
 
 .DEFAULT_GOAL := help
@@ -40,6 +40,7 @@ COVERAGE_XML ?= reports/coverage.xml
 COVERAGE_HTML ?= reports/htmlcov
 JUNIT_XML ?= reports/junit.xml
 BACKUP_ARGS ?=
+MIGRATE_ARGS ?=
 
 # ---------------------------------------------------------------------------
 # exec when running, run --rm otherwise — avoids container startup overhead
@@ -99,6 +100,7 @@ help:
 	@echo "    backup         Runs the Docker-backed backup utility and writes artifacts under outputs/"
 	@echo "    retrieve       Runs an interactive app to validate the retrieval logic"
 	@echo "    validate       Runs the post-ingest validation script"
+	@echo "    migrate-legacy-qdrant-collection  Backs up and migrates a legacy Qdrant collection into the ADR-style name"
 	@echo ""
 
 init:
@@ -191,3 +193,6 @@ retrieve:
 
 validate:
 	$(call exec_or_run,python scripts/validate_ingestion.py)
+
+migrate-legacy-qdrant-collection:
+	$(call exec_or_run,python scripts/migrate_legacy_qdrant_collection.py $(MIGRATE_ARGS))

@@ -1,3 +1,4 @@
+import os
 import re
 from typing import Any, Literal, cast
 
@@ -21,6 +22,7 @@ DEFAULT_EMBEDDING_MODELS: dict[EmbeddingProviderName, str] = {
     "google": "text-embedding-004",
 }
 DEFAULT_VALIDATION_QUERY = "A time-travel movie with a scientist and a DeLorean"
+DEFAULT_ENV_FILE = os.getenv("RAG_ENV_FILE", ".env")
 
 KNOWN_MODEL_DIMENSIONS: dict[EmbeddingProviderName, dict[str, int]] = {
     "openai": {
@@ -83,7 +85,11 @@ def infer_embedding_dimension(provider: EmbeddingProviderName, model: str) -> in
 class RAGConfig(BaseSettings):
     """Project-wide settings and configuration managed by Pydantic."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=DEFAULT_ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     qdrant_url: str | None = Field(None, validation_alias="QDRANT_URL")
     qdrant_api_key_rw: str | None = Field(None, validation_alias="QDRANT_API_KEY_RW")

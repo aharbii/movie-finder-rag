@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
+import rag.ingestion.pipeline as pipeline_module
 from rag.ingestion.csv_loader import load_movies
 from rag.ingestion.pipeline import ingest_csv
 from rag.models.movie import Movie
@@ -110,6 +111,7 @@ def test_ingest_csv_embedding_failure() -> None:
     mock_provider.model_info.name = "test-model"
     mock_provider.model_info.dimension = 3
     mock_provider.embed_batch.return_value = []  # Failure
+    mock_provider.embed.return_value = []
 
     mock_usage = MagicMock()
     mock_usage.prompt_tokens = 0
@@ -133,3 +135,110 @@ def test_ingest_csv_embedding_failure() -> None:
         ingest_csv(mock_provider, mock_store)
 
     mock_store.upsert_batch.assert_not_called()
+
+
+def test_ingest_csv_falls_back_to_per_movie_embedding() -> None:
+    """Test that a failed batch falls back to individual movie embeddings."""
+    mock_provider = MagicMock()
+    mock_provider.model_info.name = "test-model"
+    mock_provider.model_info.dimension = 3
+    mock_provider.embed_batch.return_value = []
+
+    movie_one = Movie(
+        id=1,
+        title="First",
+        release_year=2000,
+        director="D1",
+        genre=["G1"],
+        cast=["C1"],
+        plot="First plot",
+    )
+    movie_two = Movie(
+        id=2,
+        title="Second",
+        release_year=2001,
+        director="D2",
+        genre=["G2"],
+        cast=["C2"],
+        plot="Second plot",
+    )
+
+    mock_provider.embed.side_effect = [[0.1, 0.2, 0.3], []]
+
+    mock_usage = MagicMock()
+    mock_usage.prompt_tokens = 5
+    mock_usage.estimated_cost_usd = 0.0
+    mock_provider.get_model_usage.return_value = mock_usage
+
+    mock_store = MagicMock()
+    mock_store.target_name.return_value = "movies_test_model_3"
+
+    with patch("rag.ingestion.csv_loader.load_movies", return_value=[movie_one, movie_two]):
+        ingest_csv(mock_provider, mock_store)
+
+    mock_provider.embed_batch.assert_called_once_with(["First plot", "Second plot"])
+    assert mock_provider.embed.call_count == 2
+    mock_store.upsert_batch.assert_called_once_with(
+        [movie_one],
+        [[0.1, 0.2, 0.3]],
+        mock_provider.model_info,
+    )
+
+
+def test_ingest_csv_writes_skipped_movies_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Test that ingestion persists machine-readable skipped movie details."""
+    report_dir = tmp_path / "reports"
+    monkeypatch.setattr(pipeline_module, "_REPORT_DIR", report_dir)
+    monkeypatch.setattr(
+        pipeline_module,
+        "_SKIPPED_MOVIES_REPORT_PATH",
+        report_dir / "skipped-movies.json",
+    )
+    monkeypatch.setattr(pipeline_module, "_COST_REPORT_PATH", report_dir / "cost-report.json")
+    monkeypatch.setattr(pipeline_module, "_OUTPUT_ENV_PATH", tmp_path / "ingestion-outputs.env")
+
+    mock_provider = MagicMock()
+    mock_provider.model_info.name = "test-model"
+    mock_provider.model_info.dimension = 3
+    mock_provider.embed_batch.return_value = []
+    mock_provider.embed.side_effect = [[0.1, 0.2, 0.3], []]
+
+    mock_usage = MagicMock()
+    mock_usage.prompt_tokens = 5
+    mock_usage.total_tokens = 5
+    mock_usage.estimated_cost_usd = 0.0
+    mock_provider.get_model_usage.return_value = mock_usage
+
+    mock_store = MagicMock()
+    mock_store.target_name.return_value = "movies_test_model_3"
+
+    movie_one = Movie(
+        id=1,
+        title="First",
+        release_year=2000,
+        director="D1",
+        genre=["G1"],
+        cast=["C1"],
+        plot="First plot",
+    )
+    movie_two = Movie(
+        id=2,
+        title="Second",
+        release_year=2001,
+        director="D2",
+        genre=["G2"],
+        cast=["C2"],
+        plot="Second plot that fails",
+    )
+
+    with patch("rag.ingestion.csv_loader.load_movies", return_value=[movie_one, movie_two]):
+        ingest_csv(mock_provider, mock_store)
+
+    report = (report_dir / "skipped-movies.json").read_text(encoding="utf-8")
+    assert '"skipped_movie_count": 1' in report
+    assert '"id": 2' in report
+    assert '"title": "Second"' in report
+    assert '"reason": "embedding_failed_after_batch_fallback"' in report

@@ -1,3 +1,5 @@
+from typing import Any
+
 from rag.config import infer_embedding_dimension, settings
 from rag.embeddings.base import EmbeddingModelMetadata, EmbeddingModelUsage, EmbeddingProvider
 from rag.utils.logger import get_logger
@@ -49,7 +51,7 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         try:
-            request: dict[str, object] = {"model": self.model, "input": texts}
+            request: dict[str, Any] = {"model": self.model, "input": texts}
             if self.dimensions is not None:
                 request["dimensions"] = self.dimensions
             response = self.client.embed(**request)

@@ -64,5 +64,6 @@ After manual ingest or backup runs, the job archives:
 
 - `ingestion-outputs.env`
 - `outputs/reports/cost-report.json`
+- `outputs/reports/skipped-movies.json`
 - `outputs/reports/validation-report.json`
 - `outputs/backups/**`

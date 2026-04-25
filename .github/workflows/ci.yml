@@ -26,7 +26,8 @@
 #   KAGGLE_API_TOKEN
 #
 # Artifact contract:
-# - Ingestion emits `ingestion-outputs.env` and `outputs/reports/cost-report.json`.
+# - Ingestion emits `ingestion-outputs.env`, `outputs/reports/cost-report.json`,
+#   and `outputs/reports/skipped-movies.json`.
 # - Validation emits `outputs/reports/validation-report.json`.
 # - Backup emits a portable ChromaDB artifact under `outputs/backups/**`.
 # =============================================================================
@@ -259,6 +260,7 @@ jobs:
           path: |
             ingestion-outputs.env
             outputs/reports/cost-report.json
+            outputs/reports/skipped-movies.json
           if-no-files-found: ignore
 
   # -------------------------------------------------------------------------- #

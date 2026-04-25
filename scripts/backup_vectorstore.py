@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,7 @@ class BackupConfig:
     embedding_dimension: int | None = None
     vector_store_url: str | None = None
     vector_store_api_key: str | None = None
+    request_timeout: int | None = None
     chromadb_persist_path: str | None = None
     pinecone_index_name: str | None = None
     pinecone_index_host: str | None = None
@@ -84,6 +86,7 @@ class QdrantBackupSource:
         self.client = QdrantClient(
             url=config.vector_store_url,
             api_key=config.vector_store_api_key,
+            timeout=config.request_timeout,
         )
 
     def count_points(self) -> int:
@@ -101,6 +104,7 @@ class QdrantBackupSource:
                 offset=offset,
                 with_payload=True,
                 with_vectors=True,
+                timeout=self.config.request_timeout,
             )
 
             if not records:
@@ -338,7 +342,7 @@ class PGVectorBackupSource:
             offset += len(rows)
 
     def _connect(self) -> Any:
-        connection = self._psycopg.connect(self.config.pgvector_dsn)
+        connection = self._psycopg.connect(cast(str, self.config.pgvector_dsn))
         self._register_vector(connection)
         return connection
 
@@ -351,7 +355,7 @@ def backup() -> None:
 
 def backup_vector_store(config: BackupConfig) -> BackupStats:
     """Back up the configured vector store collection into a local ChromaDB artifact."""
-    logger = logging.getLogger("backup_script")
+    logger = logging.getLogger(__name__)
     source = build_backup_source(config)
     output_path = _backup_path(config)
 
@@ -470,6 +474,7 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
     )
     output_root = _env_or_default("BACKUP_OUTPUT_ROOT", str(BACKUP_ROOT))
     batch_size = int(_env_or_default("BACKUP_BATCH_SIZE", "1000"))
+    request_timeout_raw = _env_or_none("QDRANT_REQUEST_TIMEOUT") or _env_or_none("REQUEST_TIMEOUT")
     vector_store_url = _env_or_none("VECTOR_STORE_URL") or _env_or_none("QDRANT_URL")
     vector_store_api_key = _env_or_none("VECTOR_STORE_API_KEY") or _env_or_none("QDRANT_API_KEY_RW")
     embedding_dimension = _env_or_none("EMBEDDING_DIMENSION") or ingestion_outputs.get(
@@ -553,6 +558,7 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
         embedding_dimension=int(embedding_dimension) if embedding_dimension else None,
         vector_store_url=args.vector_store_url,
         vector_store_api_key=args.vector_store_api_key,
+        request_timeout=int(request_timeout_raw) if request_timeout_raw else None,
         chromadb_persist_path=args.chromadb_persist_path,
         pinecone_index_name=args.pinecone_index_name,
         pinecone_index_host=args.pinecone_index_host,
@@ -563,11 +569,15 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
 
 def configure_logging() -> None:
     """Configure stdlib logging for script execution."""
+    if logging.getLogger().handlers:
+        return
+
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
         level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
     )
 
 

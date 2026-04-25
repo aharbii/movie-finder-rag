@@ -161,6 +161,7 @@ Backend-specific settings:
 
 - `ingestion-outputs.env`
 - `outputs/reports/cost-report.json`
+- `outputs/reports/skipped-movies.json`
 
 `make validate` emits:
 

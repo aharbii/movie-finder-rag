@@ -90,7 +90,7 @@ class PGVectorStore(VectorStore):
         return [Movie(**cast_payload(row[0])) for row in rows]
 
     def _connect(self) -> Any:
-        connection = self._psycopg.connect(settings.pgvector_dsn)
+        connection = self._psycopg.connect(cast(str, settings.pgvector_dsn))
         self._register_vector(connection)
         return connection
 
