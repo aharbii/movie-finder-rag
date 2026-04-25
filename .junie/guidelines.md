@@ -1,6 +1,6 @@
 # JetBrains AI (Junie) — rag_ingestion submodule guidelines
 
-This is **`movie-finder-rag`** (`backend/rag_ingestion/`) — Offline embedding ingestion pipeline.
+This is **`movie-finder-rag`** (`rag/`) — Offline embedding ingestion pipeline.
 GitHub repo: `aharbii/movie-finder-rag` · Parent: `aharbii/movie-finder`
 
 ---

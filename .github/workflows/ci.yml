@@ -1,20 +1,35 @@
 # =============================================================================
 # movie-finder-rag — GitHub Actions CI
 #
-# Mirrors the Jenkins Multibranch pipeline 1:1.
-# Both pipelines must remain in sync. Changes to build logic must be applied
-# to both Jenkinsfile and this file.
+# Mirrors the Jenkins pipeline contract for Docker-only execution.
+# Both pipelines should stay logically aligned even if their parameter surfaces
+# differ slightly to fit each CI system.
 #
 # Modes:
 #   Contribution   — PR + main pushes: Lint · Typecheck · Test
 #   Manual ops     — workflow_dispatch with run_ingestion/run_backup:
-#                    Lint · Typecheck · Test · optional ingest/backup against live vector store
+#                    Lint · Typecheck · Test · optional ingest · validate · backup
 #
-# Required GitHub Actions secrets (manual ops only):
-#   QDRANT_URL          Qdrant Cloud endpoint
-#   QDRANT_API_KEY_RW   Read-write API key
-#   OPENAI_API_KEY      For embedding model
-#   KAGGLE_API_TOKEN    For dataset download (JSON string)
+# Docker-only contract:
+# - All quality and ops commands execute through `make ...`.
+# - Localhost assumptions are not part of the supported workflow.
+# - If Ollama is used, its URL must be reachable from inside the job container.
+#
+# Manual-ops secrets:
+#   OPENAI_API_KEY
+#   GOOGLE_API_KEY
+#   OLLAMA_API_KEY
+#   QDRANT_URL
+#   QDRANT_API_KEY_RW
+#   PINECONE_API_KEY
+#   PGVECTOR_DSN
+#   KAGGLE_API_TOKEN
+#
+# Artifact contract:
+# - Ingestion emits `ingestion-outputs.env`, `outputs/reports/cost-report.json`,
+#   and `outputs/reports/skipped-movies.json`.
+# - Validation emits `outputs/reports/validation-report.json`.
+# - Backup emits a portable ChromaDB artifact under `outputs/backups/**`.
 # =============================================================================
 
 name: CI
@@ -22,6 +37,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
     tags: ['v*']
@@ -30,32 +46,95 @@ on:
       run_ingestion:
         type: boolean
         default: false
-        description: Run the offline ingestion pipeline against Qdrant Cloud.
+        description: Run the offline ingestion pipeline against the configured vector store.
       run_backup:
         type: boolean
         default: false
         description: Run the backup utility against the configured live vector store.
+      embedding_provider:
+        type: choice
+        default: openai
+        options:
+          - openai
+          - ollama
+          - huggingface
+          - sentence-transformers
+          - google
+        description: ADR 0008 embedding provider selection.
+      embedding_model:
+        type: string
+        default: text-embedding-3-large
+        description: Provider-specific embedding model identifier.
+      embedding_dimensions:
+        type: string
+        default: ''
+        description: Optional output dimension override.
+      with_providers:
+        type: string
+        default: ''
+        description: Docker build extra groups, for example `local`.
       vector_store:
         type: choice
         default: qdrant
         options:
           - qdrant
-        description: Vector store type for the backup utility.
-      collection_name:
+          - chromadb
+          - pinecone
+          - pgvector
+        description: Vector store backend for ingestion, validation, and backup.
+      collection_prefix:
         type: string
         default: movies
-        description: Collection name to ingest and/or back up.
+        description: Prefix used to derive the ADR 0008 target name during ingestion.
+      collection_name:
+        type: string
+        default: ''
+        description: Concrete target name for backup-only runs when ingestion is skipped.
+      validation_query:
+        type: string
+        default: A time-travel movie with a scientist and a DeLorean
+        description: Smoke-test query for post-ingest validation.
+      ollama_url:
+        type: string
+        default: http://ollama:11434
+        description: Docker-reachable Ollama base URL.
+      chromadb_persist_path:
+        type: string
+        default: outputs/chromadb/local
+        description: Persistent path for chromadb ingestion and backup.
+      pinecone_index_name:
+        type: string
+        default: movie-finder-rag
+        description: Pinecone index name when vector_store=pinecone.
+      pinecone_index_host:
+        type: string
+        default: ''
+        description: Optional Pinecone host override.
+      pinecone_cloud:
+        type: string
+        default: aws
+        description: Pinecone serverless cloud used for index creation.
+      pinecone_region:
+        type: string
+        default: us-east-1
+        description: Pinecone serverless region used for index creation.
+      pgvector_schema:
+        type: string
+        default: public
+        description: Schema token used when vector_store=pgvector.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-
   # -------------------------------------------------------------------------- #
   lint:
     name: Lint
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,7 +148,10 @@ jobs:
   # -------------------------------------------------------------------------- #
   typecheck:
     name: Typecheck
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,11 +165,14 @@ jobs:
   # -------------------------------------------------------------------------- #
   test:
     name: Test
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       checks: write
       pull-requests: write
       contents: read
+    env:
+      WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,7 +190,7 @@ jobs:
           files: reports/junit.xml
 
       - name: Generate coverage summary
-        if: always()
+        if: always() && hashFiles('reports/coverage.xml') != ''
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: reports/coverage.xml
@@ -119,7 +204,7 @@ jobs:
           thresholds: '10 80'
 
       - name: Post coverage comment
-        if: always() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && hashFiles('code-coverage-results.md') != ''
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true
@@ -139,11 +224,28 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_ingestion == 'true'
     env:
+      WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
+      VECTOR_STORE: ${{ github.event.inputs.vector_store || 'qdrant' }}
+      QDRANT_COLLECTION_PREFIX: ${{ github.event.inputs.collection_prefix || 'movies' }}
+      EMBEDDING_PROVIDER: ${{ github.event.inputs.embedding_provider || 'openai' }}
+      EMBEDDING_MODEL: ${{ github.event.inputs.embedding_model || 'text-embedding-3-large' }}
+      EMBEDDING_DIMENSIONS: ${{ github.event.inputs.embedding_dimensions || '' }}
+      VALIDATION_QUERY: ${{ github.event.inputs.validation_query || 'A time-travel movie with a scientist and a DeLorean' }}
+      OLLAMA_URL: ${{ github.event.inputs.ollama_url || 'http://ollama:11434' }}
+      CHROMADB_PERSIST_PATH: ${{ github.event.inputs.chromadb_persist_path || 'outputs/chromadb/local' }}
+      PINECONE_INDEX_NAME: ${{ github.event.inputs.pinecone_index_name || 'movie-finder-rag' }}
+      PINECONE_INDEX_HOST: ${{ github.event.inputs.pinecone_index_host || '' }}
+      PINECONE_CLOUD: ${{ github.event.inputs.pinecone_cloud || 'aws' }}
+      PINECONE_REGION: ${{ github.event.inputs.pinecone_region || 'us-east-1' }}
+      PGVECTOR_SCHEMA: ${{ github.event.inputs.pgvector_schema || 'public' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
       QDRANT_URL: ${{ secrets.QDRANT_URL }}
       QDRANT_API_KEY_RW: ${{ secrets.QDRANT_API_KEY_RW }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+      PGVECTOR_DSN: ${{ secrets.PGVECTOR_DSN }}
       KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
-      QDRANT_COLLECTION_NAME: ${{ github.event.inputs.collection_name || 'movies' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -159,26 +261,91 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ingestion-outputs
-          path: ingestion-outputs.env
+          path: |
+            ingestion-outputs.env
+            outputs/reports/cost-report.json
+            outputs/reports/skipped-movies.json
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------- #
+  validate:
+    name: Validate
+    needs: [lint, typecheck, test, ingest]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_ingestion == 'true'
+    env:
+      WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
+      VECTOR_STORE: ${{ github.event.inputs.vector_store || 'qdrant' }}
+      QDRANT_COLLECTION_PREFIX: ${{ github.event.inputs.collection_prefix || 'movies' }}
+      EMBEDDING_PROVIDER: ${{ github.event.inputs.embedding_provider || 'openai' }}
+      EMBEDDING_MODEL: ${{ github.event.inputs.embedding_model || 'text-embedding-3-large' }}
+      EMBEDDING_DIMENSIONS: ${{ github.event.inputs.embedding_dimensions || '' }}
+      VALIDATION_QUERY: ${{ github.event.inputs.validation_query || 'A time-travel movie with a scientist and a DeLorean' }}
+      OLLAMA_URL: ${{ github.event.inputs.ollama_url || 'http://ollama:11434' }}
+      CHROMADB_PERSIST_PATH: ${{ github.event.inputs.chromadb_persist_path || 'outputs/chromadb/local' }}
+      PINECONE_INDEX_NAME: ${{ github.event.inputs.pinecone_index_name || 'movie-finder-rag' }}
+      PINECONE_INDEX_HOST: ${{ github.event.inputs.pinecone_index_host || '' }}
+      PINECONE_CLOUD: ${{ github.event.inputs.pinecone_cloud || 'aws' }}
+      PINECONE_REGION: ${{ github.event.inputs.pinecone_region || 'us-east-1' }}
+      PGVECTOR_SCHEMA: ${{ github.event.inputs.pgvector_schema || 'public' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY_RW: ${{ secrets.QDRANT_API_KEY_RW }}
+      PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+      PGVECTOR_DSN: ${{ secrets.PGVECTOR_DSN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize
+        run: make init
+
+      - name: Run validation
+        run: make validate
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-results
+          path: outputs/reports/validation-report.json
           if-no-files-found: ignore
 
   # -------------------------------------------------------------------------- #
   backup:
     name: Backup
-    needs: [lint, typecheck, test, ingest]
+    needs: [lint, typecheck, test, ingest, validate]
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.run_backup == 'true' || github.event.inputs.run_ingestion == 'true') &&
-      (needs.ingest.result == 'success' || needs.ingest.result == 'skipped')
+      (needs.ingest.result == 'success' || needs.ingest.result == 'skipped') &&
+      (needs.validate.result == 'success' || needs.validate.result == 'skipped')
     env:
+      WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
       VECTOR_STORE: ${{ github.event.inputs.vector_store || 'qdrant' }}
-      BACKUP_COLLECTION_NAME: ${{ github.event.inputs.collection_name || 'movies' }}
-      BACKUP_OUTPUT_ROOT: outputs/backups/chromadb
-      VECTOR_STORE_URL: ${{ secrets.QDRANT_URL }}
-      VECTOR_STORE_API_KEY: ${{ secrets.QDRANT_API_KEY_RW }}
+      BACKUP_COLLECTION_NAME: ${{ github.event.inputs.collection_name || '' }}
+      BACKUP_OUTPUT_ROOT: outputs/backups
+      QDRANT_COLLECTION_PREFIX: ${{ github.event.inputs.collection_prefix || 'movies' }}
+      EMBEDDING_PROVIDER: ${{ github.event.inputs.embedding_provider || 'openai' }}
+      EMBEDDING_MODEL: ${{ github.event.inputs.embedding_model || 'text-embedding-3-large' }}
+      EMBEDDING_DIMENSIONS: ${{ github.event.inputs.embedding_dimensions || '' }}
+      OLLAMA_URL: ${{ github.event.inputs.ollama_url || 'http://ollama:11434' }}
+      CHROMADB_PERSIST_PATH: ${{ github.event.inputs.chromadb_persist_path || 'outputs/chromadb/local' }}
+      PINECONE_INDEX_NAME: ${{ github.event.inputs.pinecone_index_name || 'movie-finder-rag' }}
+      PINECONE_INDEX_HOST: ${{ github.event.inputs.pinecone_index_host || '' }}
+      PINECONE_CLOUD: ${{ github.event.inputs.pinecone_cloud || 'aws' }}
+      PINECONE_REGION: ${{ github.event.inputs.pinecone_region || 'us-east-1' }}
+      PGVECTOR_SCHEMA: ${{ github.event.inputs.pgvector_schema || 'public' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
       QDRANT_URL: ${{ secrets.QDRANT_URL }}
       QDRANT_API_KEY_RW: ${{ secrets.QDRANT_API_KEY_RW }}
+      PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+      PGVECTOR_DSN: ${{ secrets.PGVECTOR_DSN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

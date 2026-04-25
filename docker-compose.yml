@@ -1,13 +1,3 @@
-# =============================================================================
-# movie-finder-rag — Docker-only local development stack
-#
-# Services:
-#   rag        Attached-container workspace for lint/test/debug/editor flows
-#   ingestion  One-shot runtime image for the manual ingestion entrypoint
-#
-# Qdrant is external-only. No local Qdrant container is supported here.
-# =============================================================================
-
 name: movie-finder-rag-local
 
 services:
@@ -16,24 +6,40 @@ services:
       context: .
       dockerfile: Dockerfile
       target: dev
+      args:
+        WITH_PROVIDERS: ${WITH_PROVIDERS:-}
     image: movie-finder-rag:dev
     working_dir: /workspace
-    command:
-      - "sleep"
-      - "infinity"
+    command: ["sleep", "infinity"]
     environment:
       GIT_DIR: /workspace/.gitdir
       GIT_WORK_TREE: /workspace
-      VECTOR_STORE: ${VECTOR_STORE:-}
+      VECTOR_STORE: ${VECTOR_STORE:-qdrant}
       VECTOR_STORE_URL: ${VECTOR_STORE_URL:-}
       VECTOR_STORE_API_KEY: ${VECTOR_STORE_API_KEY:-}
       BACKUP_COLLECTION_NAME: ${BACKUP_COLLECTION_NAME:-}
       BACKUP_OUTPUT_ROOT: ${BACKUP_OUTPUT_ROOT:-}
       BACKUP_BATCH_SIZE: ${BACKUP_BATCH_SIZE:-}
+      CHROMADB_PERSIST_PATH: ${CHROMADB_PERSIST_PATH:-}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-}
+      PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST:-}
+      PINECONE_CLOUD: ${PINECONE_CLOUD:-}
+      PINECONE_REGION: ${PINECONE_REGION:-}
+      PGVECTOR_DSN: ${PGVECTOR_DSN:-}
+      PGVECTOR_SCHEMA: ${PGVECTOR_SCHEMA:-}
       QDRANT_URL: ${QDRANT_URL:-}
       QDRANT_API_KEY_RW: ${QDRANT_API_KEY_RW:-}
-      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-movies}
+      QDRANT_COLLECTION_PREFIX: ${QDRANT_COLLECTION_PREFIX:-movies}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      SENTENCE_TRANSFORMERS_CACHE_DIR: ${SENTENCE_TRANSFORMERS_CACHE_DIR:-}
+      VALIDATION_QUERY: ${VALIDATION_QUERY:-}
       KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
     volumes:
       - .:/workspace
@@ -49,18 +55,36 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
+      args:
+        WITH_PROVIDERS: ${WITH_PROVIDERS:-}
     image: movie-finder-rag:runtime
     environment:
-      VECTOR_STORE: ${VECTOR_STORE:-}
+      VECTOR_STORE: ${VECTOR_STORE:-qdrant}
       VECTOR_STORE_URL: ${VECTOR_STORE_URL:-}
       VECTOR_STORE_API_KEY: ${VECTOR_STORE_API_KEY:-}
       BACKUP_COLLECTION_NAME: ${BACKUP_COLLECTION_NAME:-}
       BACKUP_OUTPUT_ROOT: ${BACKUP_OUTPUT_ROOT:-}
       BACKUP_BATCH_SIZE: ${BACKUP_BATCH_SIZE:-}
+      CHROMADB_PERSIST_PATH: ${CHROMADB_PERSIST_PATH:-}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-}
+      PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST:-}
+      PINECONE_CLOUD: ${PINECONE_CLOUD:-}
+      PINECONE_REGION: ${PINECONE_REGION:-}
+      PGVECTOR_DSN: ${PGVECTOR_DSN:-}
+      PGVECTOR_SCHEMA: ${PGVECTOR_SCHEMA:-}
       QDRANT_URL: ${QDRANT_URL:-}
       QDRANT_API_KEY_RW: ${QDRANT_API_KEY_RW:-}
-      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-movies}
+      QDRANT_COLLECTION_PREFIX: ${QDRANT_COLLECTION_PREFIX:-movies}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      SENTENCE_TRANSFORMERS_CACHE_DIR: ${SENTENCE_TRANSFORMERS_CACHE_DIR:-}
+      VALIDATION_QUERY: ${VALIDATION_QUERY:-}
       KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
     restart: "no"
 

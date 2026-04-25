@@ -1,23 +1,14 @@
-from typing import Any
-
 from openai import OpenAI
 from openai.types.create_embedding_response import Usage
 
-from rag.config import settings
-from rag.embeddings.base import (
-    EmbeddingModelMetadata,
-    EmbeddingModelUsage,
-    EmbeddingProvider,
-)
+from rag.config import infer_embedding_dimension, settings
+from rag.embeddings.base import EmbeddingModelMetadata, EmbeddingModelUsage, EmbeddingProvider
 from rag.utils.logger import get_logger
 
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):
-    """
-    OpenAI-specific embedding provider implementing cost and usage tracking.
-    """
+    """OpenAI embedding provider with usage and cost tracking."""
 
-    # Authoritative model map using universal metadata structure
     MODELS: dict[str, EmbeddingModelMetadata] = {
         "text-embedding-3-small": EmbeddingModelMetadata(
             name="text-embedding-3-small", dimension=1536, cost_per_1k_tokens=0.00002
@@ -30,20 +21,10 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         ),
     }
 
-    def __init__(self, model: str = settings.openai_embedding_model) -> None:
-        """Initialize the OpenAI provider using settings.
-
-        Args:
-            model (str): The OpenAI model name to use.
-        """
+    def __init__(self, model: str | None = None) -> None:
         self.logger = get_logger(self.__class__.__name__)
-        self.model = model
-
-        if self.model not in self.MODELS:
-            self.logger.warning(
-                f"Model '{self.model}' is not in the authoritative metadata map. "
-                "Usage and cost tracking may be inaccurate."
-            )
+        self.model = model or settings.embedding_model
+        self.dimensions = settings.embedding_dimensions
 
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is not defined in settings")
@@ -53,52 +34,47 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
 
     @property
     def model_info(self) -> EmbeddingModelMetadata:
-        """Return the standardized model metadata."""
         metadata = self.MODELS.get(self.model)
-        if metadata:
+        if metadata is not None:
+            if self.dimensions is not None:
+                return metadata.model_copy(update={"dimension": self.dimensions})
             return metadata
 
-        return EmbeddingModelMetadata(
-            name=self.model, dimension=settings.embedding_dimension, cost_per_1k_tokens=0.0
-        )
+        dimension = self.dimensions or infer_embedding_dimension("openai", self.model)
+        if dimension <= 0:
+            raise ValueError(
+                f"Unknown OpenAI embedding dimension for model '{self.model}'. "
+                "Add the model to the metadata map before using it for ingestion."
+            )
 
-    def embed(self, text: str) -> list[float] | Any:
-        """Generate an embedding for a single string of text."""
-        try:
-            response = self.client.embeddings.create(model=self.model, input=text)
-            self._update_usage(response.usage)
-            return response.data[0].embedding
-        except Exception as e:
-            self.logger.error(f"Error calling OpenAI API: {e}")
-            return []
+        return EmbeddingModelMetadata(name=self.model, dimension=dimension, cost_per_1k_tokens=0.0)
+
+    def embed(self, text: str) -> list[float]:
+        vectors = self.embed_batch([text])
+        return vectors[0] if vectors else []
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for a batch of strings."""
         try:
-            response = self.client.embeddings.create(model=self.model, input=texts)
+            if self.dimensions is not None:
+                response = self.client.embeddings.create(
+                    model=self.model,
+                    input=texts,
+                    dimensions=self.dimensions,
+                )
+            else:
+                response = self.client.embeddings.create(model=self.model, input=texts)
             self._update_usage(response.usage)
             return [data.embedding for data in response.data]
-        except Exception as e:
-            self.logger.error(f"Error calling OpenAI API for batch: {e}")
+        except Exception as exc:
+            self.logger.error("Error calling OpenAI embeddings API: %s", exc)
             return []
 
     def get_model_usage(self) -> EmbeddingModelUsage:
-        """Return cumulative usage and estimated cost for this instance."""
         return self._usage
 
     def _update_usage(self, usage: Usage) -> None:
-        """Calculate cost and update usage statistics."""
         metadata = self.MODELS.get(self.model)
         cost_per_1k = metadata.cost_per_1k_tokens if metadata else 0.0
-
         self._usage.prompt_tokens += usage.prompt_tokens
         self._usage.total_tokens += usage.total_tokens
-
-        # Calculate USD cost: (tokens / 1000) * price_per_1k
-        incremental_cost = (usage.total_tokens / 1000) * cost_per_1k
-        self._usage.estimated_cost_usd += incremental_cost
-
-        self.logger.debug(
-            f"Model: {self.model} | Total Tokens: {self._usage.total_tokens} | "
-            f"Est. Cost: ${self._usage.estimated_cost_usd:.5f}"
-        )
+        self._usage.estimated_cost_usd += (usage.total_tokens / 1000) * cost_per_1k

@@ -33,6 +33,7 @@ outputs/
 # Logs
 logs/
 *.log
+ingestion-outputs.env
 
 # Dataset (large files — download via kagglehub, never commit)
 /dataset/
@@ -44,3 +45,4 @@ chroma/
 # OS
 .DS_Store
 Thumbs.db
+.gitdir
