@@ -35,6 +35,9 @@ local = [
     "sentence-transformers>=5.1.2",
     "torch>=2.8.0",
 ]
+tui = [
+    "textual>=0.80.0",
+]
 
 [dependency-groups]
 lint = ["ruff>=0.15.9", "mypy>=1.20.0"]
@@ -44,6 +47,7 @@ dev = [
     { include-group = "test" },
     "pre-commit>=4.5.1",
     "detect-secrets>=1.5.0",
+    "textual>=0.80.0",
 ]
 
 [tool.uv]
@@ -83,6 +87,12 @@ warn_return_any = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
 
+
+[[tool.mypy.overrides]]
+module = ["rag.tui.*"]
+warn_unused_ignores = false
+
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
@@ -91,7 +101,7 @@ addopts = ["-v", "--tb=short"]
 [tool.coverage.run]
 source = ["src"]
 relative_files = true
-omit = ["tests/*", "scripts/*", "*/py.typed"]
+omit = ["tests/*", "scripts/*", "*/tui/*", "*/py.typed"]
 
 [tool.coverage.report]
 show_missing = true
