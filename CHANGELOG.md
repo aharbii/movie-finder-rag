@@ -10,6 +10,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `scripts/retrieve.py` — replaced linear CLI evaluation script with a full Textual TUI
+  (`RetrievalApp`). The new app provides a left sidebar for selecting embedding provider,
+  model, vector store, and top-k, a main search area with a scrollable list of `MovieCard`
+  result widgets, a non-blocking background worker for embedding + search, and a Backup
+  button that triggers the existing `backup_vectorstore.py` logic without blocking the UI.
+- `tests/test_retrieve.py` — unit tests for `MovieCard`, `RetrievalApp` helpers, the
+  `main()` entry point, and the PROVIDERS / VECTOR_STORES / TOP_K_OPTIONS constants.
+- `pyproject.toml` — `textual>=0.80.0` already declared as a runtime dependency (no change
+  needed; dependency was added in the same sprint).
+
 - `Makefile` — Docker-only repo contract for `init`, `up`, `down`, `logs`, `shell`, `lint`,
   `format`, `typecheck`, `test`, `test-coverage`, `pre-commit`, and `ingest`
 - Comprehensive test suite for `movie-finder-rag` module, increasing coverage from 31% to 96%:
