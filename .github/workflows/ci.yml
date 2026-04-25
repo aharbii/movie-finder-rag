@@ -37,6 +37,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
     tags: ['v*']
@@ -130,6 +131,7 @@ jobs:
   # -------------------------------------------------------------------------- #
   lint:
     name: Lint
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
@@ -146,6 +148,7 @@ jobs:
   # -------------------------------------------------------------------------- #
   typecheck:
     name: Typecheck
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       WITH_PROVIDERS: ${{ github.event.inputs.with_providers || '' }}
@@ -162,6 +165,7 @@ jobs:
   # -------------------------------------------------------------------------- #
   test:
     name: Test
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -186,7 +190,7 @@ jobs:
           files: reports/junit.xml
 
       - name: Generate coverage summary
-        if: always()
+        if: always() && hashFiles('reports/coverage.xml') != ''
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: reports/coverage.xml
@@ -200,7 +204,7 @@ jobs:
           thresholds: '10 80'
 
       - name: Post coverage comment
-        if: always() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && hashFiles('code-coverage-results.md') != ''
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true

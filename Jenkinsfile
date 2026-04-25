@@ -7,6 +7,10 @@
 //   Manual ops     — "Build with Parameters" with RUN_INGESTION/RUN_BACKUP=true:
 //                    Lint + Typecheck + Test + optional ingest + validate + backup
 //
+// Repo-side guards also skip draft PRs and non-main branch jobs. The Jenkins
+// multibranch source should still be configured to discover only main + PRs;
+// these guards prevent expensive work if Jenkins indexes extra branches.
+//
 // NOTE: This image is NOT pushed to ACR. The rag pipeline is an offline
 // one-shot ingestion tool run manually. Only backend and frontend images are
 // published to ACR.
@@ -33,6 +37,8 @@
 //
 // Required Jenkins plugins: Docker Pipeline, JUnit, Coverage, Credentials Binding
 // =============================================================================
+
+def pipelineEligibility = null
 
 pipeline {
     agent any
@@ -154,7 +160,23 @@ pipeline {
 
     stages {
         // ------------------------------------------------------------------ //
+        stage('CI Eligibility') {
+            steps {
+                script {
+                    if (shouldRunPipeline()) {
+                        echo "RAG CI enabled for ${env.CHANGE_ID ? "PR-${env.CHANGE_ID}" : env.BRANCH_NAME}."
+                    } else {
+                        echo "RAG CI skipped for ${env.CHANGE_ID ? "draft PR-${env.CHANGE_ID}" : "branch ${env.BRANCH_NAME}"}."
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------ //
         stage('Initialize') {
+            when {
+                expression { shouldRunPipeline() }
+            }
             steps {
                 script {
                     env.WITH_PROVIDERS = params.WITH_PROVIDERS ?: ''
@@ -165,6 +187,9 @@ pipeline {
 
         // ------------------------------------------------------------------ //
         stage('Lint + Typecheck') {
+            when {
+                expression { shouldRunPipeline() }
+            }
             parallel {
                 stage('Lint') {
                     steps { sh 'make lint' }
@@ -177,6 +202,9 @@ pipeline {
 
         // ------------------------------------------------------------------ //
         stage('Test') {
+            when {
+                expression { shouldRunPipeline() }
+            }
             steps {
                 sh 'make test-coverage'
             }
@@ -202,7 +230,7 @@ pipeline {
         // ------------------------------------------------------------------ //
         stage('Ingest') {
             when {
-                expression { params.RUN_INGESTION == true }
+                expression { shouldRunPipeline() && params.RUN_INGESTION == true }
             }
             environment {
                 QDRANT_URL        = credentials('qdrant-url')
@@ -225,7 +253,7 @@ pipeline {
         // ------------------------------------------------------------------ //
         stage('Post-Ingest Validate') {
             when {
-                expression { params.RUN_INGESTION == true }
+                expression { shouldRunPipeline() && params.RUN_INGESTION == true }
             }
             environment {
                 QDRANT_URL        = credentials('qdrant-url')
@@ -247,7 +275,9 @@ pipeline {
         // ------------------------------------------------------------------ //
         stage('Backup') {
             when {
-                expression { params.RUN_BACKUP == true || params.RUN_INGESTION == true }
+                expression {
+                    shouldRunPipeline() && (params.RUN_BACKUP == true || params.RUN_INGESTION == true)
+                }
             }
             environment {
                 QDRANT_URL        = credentials('qdrant-url')
@@ -269,7 +299,9 @@ pipeline {
         // ------------------------------------------------------------------ //
         stage('Archive Artifacts') {
             when {
-                expression { params.RUN_INGESTION == true || params.RUN_BACKUP == true }
+                expression {
+                    shouldRunPipeline() && (params.RUN_INGESTION == true || params.RUN_BACKUP == true)
+                }
             }
             steps {
                 archiveArtifacts(
@@ -282,9 +314,66 @@ pipeline {
 
     post {
         always {
-            sh 'make clean || true'
-            sh 'make ci-down || true'
-            cleanWs()
+            script {
+                if (shouldRunPipeline()) {
+                    sh 'make clean || true'
+                    sh 'make ci-down || true'
+                } else {
+                    echo 'Skipping Docker cleanup because no RAG CI stages ran.'
+                }
+                cleanWs()
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------- //
+def shouldRunPipeline() {
+    if (pipelineEligibility != null) {
+        return pipelineEligibility
+    }
+
+    if (env.CHANGE_ID) {
+        pipelineEligibility = !isDraftPullRequest()
+        return pipelineEligibility
+    }
+
+    pipelineEligibility = env.BRANCH_NAME == 'main'
+    return pipelineEligibility
+}
+
+// -------------------------------------------------------------------------- //
+def isDraftPullRequest() {
+    withCredentials([
+        usernamePassword(
+            credentialsId: 'github-pat',
+            usernameVariable: 'GITHUB_USER',
+            passwordVariable: 'GITHUB_TOKEN'
+        )
+    ]) {
+        withEnv(["PR_NUMBER=${env.CHANGE_ID}"]) {
+            def draft = sh(
+                script: '''
+                    set +x
+                    python3 - <<'PY'
+import json
+import os
+import urllib.request
+
+request = urllib.request.Request(
+    f"https://api.github.com/repos/aharbii/movie-finder-rag/pulls/{os.environ['PR_NUMBER']}",
+    headers={
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+    },
+)
+with urllib.request.urlopen(request, timeout=20) as response:
+    print(str(bool(json.load(response).get("draft"))).lower())
+PY
+                ''',
+                returnStdout: true,
+            ).trim()
+            return draft == 'true'
         }
     }
 }
