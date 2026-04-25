@@ -387,6 +387,21 @@ def test_pinecone_get_index_no_host(
         cast(MagicMock, store.client.describe_index).return_value = {"host": "my-host"}
 
         index = store._get_index(model_metadata)
-        cast(MagicMock, store.client.create_index).assert_called_once()
-        cast(MagicMock, store.client.Index).assert_called_with(host="my-host")
         assert index is not None
+        assert store.index_host == "my-host"
+
+
+def test_pinecone_ensure_index_exists(
+    model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "pinecone_api_key", "test")
+    mock_pinecone = MagicMock()
+    with patch.dict(
+        sys.modules, {"pinecone": MagicMock(Pinecone=mock_pinecone, ServerlessSpec=MagicMock())}
+    ):
+        store = PineconeVectorStore()
+        cast(MagicMock, store.client.has_index).return_value = True
+
+        store._ensure_index(model_metadata)
+
+        cast(MagicMock, store.client.create_index).assert_not_called()

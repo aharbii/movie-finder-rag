@@ -22,5 +22,5 @@ def main() -> None:
     pipeline.ingest_csv(embedding_provider, vector_store)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

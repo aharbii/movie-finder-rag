@@ -42,3 +42,15 @@ def test_vector_store_factory_dispatch(monkeypatch: MonkeyPatch) -> None:
         get_vector_store.cache_clear()
         store = create_vector_store("qdrant")
         assert isinstance(store, QdrantVectorStore)
+
+
+def test_vector_store_factory_is_cached(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr("rag.vectorstore.factory.settings.vector_store", "qdrant")
+    monkeypatch.setattr("rag.vectorstore.qdrant_vectorstore.settings.qdrant_url", "http://test")
+    monkeypatch.setattr("rag.vectorstore.qdrant_vectorstore.settings.qdrant_api_key_rw", "key")
+
+    with patch("rag.vectorstore.qdrant_vectorstore.QdrantClient"):
+        get_vector_store.cache_clear()
+        first = get_vector_store()
+        second = get_vector_store()
+        assert first is second

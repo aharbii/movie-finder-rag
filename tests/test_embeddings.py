@@ -208,6 +208,14 @@ def test_openai_provider_model_info_override(monkeypatch: pytest.MonkeyPatch) ->
         assert provider.model_info.dimension == 512
 
 
+def test_openai_provider_model_info_known_no_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "openai_api_key", "test")
+    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    with patch("rag.embeddings.openai_provider.OpenAI"):
+        provider = OpenAIEmbeddingProvider(model="text-embedding-3-small")
+        assert provider.model_info.dimension == 1536
+
+
 def test_openai_provider_model_info_infer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
     monkeypatch.setattr(settings, "embedding_dimensions", None)

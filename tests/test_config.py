@@ -196,9 +196,21 @@ def test_validate_collection_prefix_empty(monkeypatch: pytest.MonkeyPatch) -> No
         RAGConfig()
 
 
-def test_validate_collection_prefix_invalid() -> None:
-    # Just to reach the method signature, though the exception might be unreachable via regex cleaning
-    pass
+def test_validate_collection_prefix_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_base_env(monkeypatch)
+    monkeypatch.setenv("QDRANT_COLLECTION_PREFIX", "valid_prefix")
+
+    from rag import config
+
+    class MockRegex:
+        def fullmatch(self, text: str) -> None:
+            return None
+
+    monkeypatch.setattr(config, "_COLLECTION_PREFIX_RE", MockRegex())
+    with pytest.raises(
+        ValueError, match="QDRANT_COLLECTION_PREFIX must contain only lowercase letters"
+    ):
+        RAGConfig()
 
 
 def test_validate_collection_prefix_cleans(monkeypatch: pytest.MonkeyPatch) -> None:
