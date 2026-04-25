@@ -96,7 +96,7 @@ addopts = ["-v", "--tb=short"]
 [tool.coverage.run]
 source = ["src"]
 relative_files = true
-omit = ["tests/*", "scripts/*", "*/py.typed"]
+omit = ["tests/*", "scripts/*", "*/tui/*", "*/py.typed"]
 
 [tool.coverage.report]
 show_missing = true
