@@ -2,97 +2,49 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
-from typing import Any, cast
+from typing import Any
 
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, ScrollableContainer, Vertical
+from textual.containers import ScrollableContainer, Vertical
 from textual.reactive import reactive
-from textual.widgets import Button, Footer, Header, Input, Label, Log, Select, Static
+from textual.widgets import Button, Footer, Header, Label, Static, TextArea
 
 from rag.config import DEFAULT_EMBEDDING_MODELS, EmbeddingProviderName, VectorStoreName
 from rag.embeddings.factory import create_embedding_provider
 from rag.models.movie import Movie
 from rag.tui.constants import (
     BACKUP_BUTTON_ID,
-    MODEL_SELECT_ID,
-    PROVIDER_SELECT_ID,
-    PROVIDERS,
+    COMMAND_HELP,
+    MESSAGE_BAR_ID,
+    PROVIDER_NAMES,
     RESULTS_LIST_ID,
     SEARCH_BUTTON_ID,
     SEARCH_INPUT_ID,
-    STATUS_LOG_ID,
-    TOP_K_OPTIONS,
-    TOP_K_SELECT_ID,
-    VECTOR_STORE_SELECT_ID,
+    TOP_K_VALUES,
+    VECTOR_STORE_NAMES,
     VECTOR_STORES,
 )
-from rag.tui.widgets import MovieCard
+from rag.tui.widgets import MovieCard, SettingsBar
 from rag.vectorstore.factory import create_vector_store
 
 logger = logging.getLogger(__name__)
 
 _CSS = """
 Screen {
-    layout: horizontal;
-}
-
-#sidebar {
-    width: 30;
-    min-width: 28;
-    height: 100%;
-    background: $panel;
-    border-right: solid $primary;
-    padding: 1 2;
-}
-
-#sidebar Label {
-    color: $text-muted;
-    margin-top: 1;
-}
-
-#sidebar Select {
-    margin-bottom: 1;
-}
-
-#main-area {
-    width: 1fr;
-    height: 100%;
     layout: vertical;
 }
 
-#search-bar {
-    height: 5;
-    padding: 1 2;
-    background: $surface;
-    border-bottom: solid $primary;
-    layout: horizontal;
-}
-
-#search-input {
-    width: 1fr;
-    margin-right: 1;
-}
-
-#search-button {
-    width: 14;
-}
-
-#content-area {
-    height: 1fr;
-    layout: horizontal;
-}
-
 #results-scroll {
-    width: 1fr;
-    height: 100%;
+    height: 1fr;
+    border-bottom: solid $primary-darken-3;
 }
 
 #results-list {
     height: auto;
-    min-height: 100%;
     padding: 1 2;
 }
 
@@ -107,16 +59,50 @@ Screen {
     background: $surface-lighten-1;
 }
 
-#status-log {
-    height: 7;
-    border-top: solid $primary;
+#input-area {
+    height: auto;
+    max-height: 10;
     padding: 0 1;
     background: $surface;
+    border-top: solid $primary;
+    layout: horizontal;
+    align: left middle;
+}
+
+#search-input {
+    height: auto;
+    max-height: 8;
+    width: 1fr;
+    margin-right: 1;
+}
+
+#button-col {
+    width: 14;
+    height: auto;
+    layout: vertical;
+}
+
+#search-button {
+    width: 100%;
+    margin-bottom: 1;
 }
 
 #backup-button {
-    margin-top: 1;
     width: 100%;
+}
+
+#settings-bar {
+    height: 1;
+    padding: 0 2;
+    background: $panel;
+    border-top: solid $primary-darken-3;
+}
+
+#message-bar {
+    height: 1;
+    padding: 0 2;
+    background: $surface;
+    color: $text-muted;
 }
 """
 
@@ -128,9 +114,10 @@ class RetrievalApp(App[None]):
     CSS = _CSS
 
     BINDINGS = [
-        Binding("ctrl+s", "search", "Search"),
-        Binding("ctrl+b", "backup", "Backup"),
-        Binding("ctrl+c", "quit", "Quit"),
+        Binding("ctrl+s", "search", "Search", show=True),
+        Binding("ctrl+b", "backup", "Backup", show=True),
+        Binding("ctrl+l", "clear_results", "Clear", show=True),
+        Binding("ctrl+c", "quit", "Quit", show=True),
     ]
 
     _provider: reactive[EmbeddingProviderName] = reactive("openai")
@@ -141,59 +128,49 @@ class RetrievalApp(App[None]):
     def compose(self) -> ComposeResult:
         """Build the TUI widget tree."""
         yield Header()
-        with Horizontal():
-            with Vertical(id="sidebar"):
-                yield Label("Provider")
-                yield Select(
-                    options=PROVIDERS,
-                    value="openai",
-                    id=PROVIDER_SELECT_ID,
-                    allow_blank=False,
-                )
-                yield Label("Model")
-                yield Select(
-                    options=self._model_options_for("openai"),
-                    value=DEFAULT_EMBEDDING_MODELS["openai"],
-                    id=MODEL_SELECT_ID,
-                    allow_blank=False,
-                )
-                yield Label("Vector Store")
-                yield Select(
-                    options=VECTOR_STORES,
-                    value="qdrant",
-                    id=VECTOR_STORE_SELECT_ID,
-                    allow_blank=False,
-                )
-                yield Label("Top-K results")
-                yield Select(
-                    options=TOP_K_OPTIONS,
-                    value=5,
-                    id=TOP_K_SELECT_ID,
-                    allow_blank=False,
-                )
-                yield Button("Backup Store", id=BACKUP_BUTTON_ID, variant="warning")
-
-            with Vertical(id="main-area"):
-                with Horizontal(id="search-bar"):
-                    yield Input(
-                        placeholder="Describe the movie you are looking for...",
-                        id=SEARCH_INPUT_ID,
-                    )
-                    yield Button("Search", id=SEARCH_BUTTON_ID, variant="primary")
-
-                with (
-                    Horizontal(id="content-area"),
-                    ScrollableContainer(id="results-scroll"),
-                    Vertical(id=RESULTS_LIST_ID),
-                ):
-                    yield Static(
-                        "[dim]Enter a query and press Search.[/dim]",
-                        id="placeholder-msg",
-                    )
-
-                yield Log(id=STATUS_LOG_ID, highlight=True)
-
+        with ScrollableContainer(id="results-scroll"), Vertical(id=RESULTS_LIST_ID):
+            yield Static(
+                COMMAND_HELP,
+                id="placeholder-msg",
+            )
+        with Vertical(id="input-area"):
+            yield TextArea(
+                id=SEARCH_INPUT_ID,
+                language=None,
+                show_line_numbers=False,
+                tab_behavior="focus",
+                soft_wrap=True,
+            )
+            with Vertical(id="button-col"):
+                yield Button("Search", id=SEARCH_BUTTON_ID, variant="primary")
+                yield Button("Backup", id=BACKUP_BUTTON_ID, variant="warning")
+        yield SettingsBar()
+        yield Label("", id=MESSAGE_BAR_ID)
         yield Footer()
+
+    # ------------------------------------------------------------------
+    # Reactive watchers — keep settings bar in sync
+    # ------------------------------------------------------------------
+
+    def watch__provider(self, value: EmbeddingProviderName) -> None:
+        """Sync model default and refresh settings bar when provider changes."""
+        self._model = DEFAULT_EMBEDDING_MODELS[value]
+        self._refresh_settings_bar()
+
+    def watch__model(self, _: str) -> None:
+        self._refresh_settings_bar()
+
+    def watch__vector_store(self, _: VectorStoreName) -> None:
+        self._refresh_settings_bar()
+
+    def watch__top_k(self, _: int) -> None:
+        self._refresh_settings_bar()
+
+    def _refresh_settings_bar(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one(SettingsBar).update_settings(
+                self._provider, self._model, self._vector_store, self._top_k
+            )
 
     # ------------------------------------------------------------------
     # Static helpers
@@ -206,65 +183,15 @@ class RetrievalApp(App[None]):
         return [(default, default)]
 
     # ------------------------------------------------------------------
-    # Reactive watchers
-    # ------------------------------------------------------------------
-
-    def watch__provider(self, value: EmbeddingProviderName) -> None:
-        """Update the model select when the provider changes."""
-        try:
-            model_select = self.query_one(f"#{MODEL_SELECT_ID}", Select)
-            new_default = DEFAULT_EMBEDDING_MODELS[value]
-            model_select.set_options(self._model_options_for(value))
-            model_select.value = new_default
-            self._model = new_default
-        except Exception:  # widget may not be mounted yet
-            pass
-
-    # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
 
-    @on(Select.Changed, f"#{PROVIDER_SELECT_ID}")
-    def on_provider_changed(self, event: Select.Changed) -> None:
-        """React to provider selection change."""
-        if event.value is Select.BLANK:
-            return
-        self._provider = cast(EmbeddingProviderName, event.value)
-
-    @on(Select.Changed, f"#{MODEL_SELECT_ID}")
-    def on_model_changed(self, event: Select.Changed) -> None:
-        """React to model selection change."""
-        if event.value is Select.BLANK:
-            return
-        self._model = str(event.value)
-
-    @on(Select.Changed, f"#{VECTOR_STORE_SELECT_ID}")
-    def on_vector_store_changed(self, event: Select.Changed) -> None:
-        """React to vector store selection change."""
-        if event.value is Select.BLANK:
-            return
-        self._vector_store = cast(VectorStoreName, event.value)
-
-    @on(Select.Changed, f"#{TOP_K_SELECT_ID}")
-    def on_top_k_changed(self, event: Select.Changed) -> None:
-        """React to top-k selection change."""
-        if event.value is Select.BLANK:
-            return
-        self._top_k = int(cast(int, event.value))
-
     @on(Button.Pressed, f"#{SEARCH_BUTTON_ID}")
     def on_search_pressed(self) -> None:
-        """Trigger the search worker."""
-        self.action_search()
-
-    @on(Input.Submitted, f"#{SEARCH_INPUT_ID}")
-    def on_search_submitted(self) -> None:
-        """Submit search on Enter key in the search box."""
         self.action_search()
 
     @on(Button.Pressed, f"#{BACKUP_BUTTON_ID}")
     def on_backup_pressed(self) -> None:
-        """Trigger the backup worker."""
         self.action_backup()
 
     # ------------------------------------------------------------------
@@ -272,17 +199,98 @@ class RetrievalApp(App[None]):
     # ------------------------------------------------------------------
 
     def action_search(self) -> None:
-        """Read the query and kick off the background search worker."""
-        query_input = self.query_one(f"#{SEARCH_INPUT_ID}", Input)
-        query = query_input.value.strip()
+        """Read the query, dispatch slash commands or kick off search."""
+        text_area = self.query_one(f"#{SEARCH_INPUT_ID}", TextArea)
+        query = text_area.text.strip()
         if not query:
-            self._log_status("[yellow]Please enter a search query first.[/yellow]")
+            self._set_message("[yellow]Enter a query or /help for commands.[/yellow]")
             return
-        self._run_search(query)
+        if query.startswith("/"):
+            self._handle_command(query)
+            text_area.clear()
+        else:
+            self._run_search(query)
 
     def action_backup(self) -> None:
-        """Kick off the background backup worker."""
         self._run_backup()
+
+    def action_clear_results(self) -> None:
+        """Clear the results panel."""
+        self._clear_results()
+        self._set_message("[dim]Results cleared.[/dim]")
+
+    # ------------------------------------------------------------------
+    # Slash command dispatcher
+    # ------------------------------------------------------------------
+
+    def _handle_command(self, raw: str) -> None:
+        """Parse and execute a slash command entered in the search field."""
+        parts = raw.split(None, 1)
+        cmd = parts[0].lower()
+        arg = parts[1].strip() if len(parts) > 1 else ""
+
+        match cmd:
+            case "/help" | "/?":
+                self._show_help()
+            case "/clear":
+                self.action_clear_results()
+            case "/provider" | "/p":
+                self._cmd_provider(arg)
+            case "/model" | "/m":
+                self._cmd_model(arg)
+            case "/store" | "/s":
+                self._cmd_store(arg)
+            case "/topk" | "/k":
+                self._cmd_topk(arg)
+            case _:
+                self._set_message(
+                    f"[red]Unknown command: {cmd}  — type /help for available commands[/red]"
+                )
+
+    def _cmd_provider(self, arg: str) -> None:
+        if arg not in PROVIDER_NAMES:
+            self._set_message(
+                f"[red]Unknown provider: {arg!r}  Valid: {', '.join(sorted(PROVIDER_NAMES))}[/red]"
+            )
+            return
+        self._provider = arg  # type: ignore[assignment]
+        self._set_message(f"[green]Provider → {arg}[/green]")
+
+    def _cmd_model(self, arg: str) -> None:
+        if not arg:
+            self._set_message("[red]/model requires a model name[/red]")
+            return
+        self._model = arg
+        self._set_message(f"[green]Model → {arg}[/green]")
+
+    def _cmd_store(self, arg: str) -> None:
+        if arg not in VECTOR_STORE_NAMES:
+            self._set_message(
+                f"[red]Unknown store: {arg!r}  "
+                f"Valid: {', '.join(v for _, v in VECTOR_STORES)}[/red]"
+            )
+            return
+        self._vector_store = arg  # type: ignore[assignment]
+        self._set_message(f"[green]Store → {arg}[/green]")
+
+    def _cmd_topk(self, arg: str) -> None:
+        try:
+            n = int(arg)
+        except ValueError:
+            self._set_message(f"[red]/topk requires an integer, got: {arg!r}[/red]")
+            return
+        if n not in TOP_K_VALUES:
+            self._set_message(f"[red]top-k must be one of {sorted(TOP_K_VALUES)}, got {n}[/red]")
+            return
+        self._top_k = n
+        self._set_message(f"[green]top-k → {n}[/green]")
+
+    def _show_help(self) -> None:
+        results_panel = self.query_one(f"#{RESULTS_LIST_ID}", Vertical)
+        for child in list(results_panel.children):
+            child.remove()
+        results_panel.mount(Static(COMMAND_HELP, id="help-msg"))
+        self._set_message("[dim]/help — command reference[/dim]")
 
     # ------------------------------------------------------------------
     # Background workers
@@ -294,10 +302,9 @@ class RetrievalApp(App[None]):
         self.call_from_thread(self._set_searching_state, True)
         try:
             self.call_from_thread(
-                self._log_status,
-                f"[cyan]Initialising provider=[bold]{self._provider}[/bold] "
-                f"model=[bold]{self._model}[/bold] "
-                f"store=[bold]{self._vector_store}[/bold][/cyan]",
+                self._set_message,
+                f"[cyan]Searching  provider={self._provider}  "
+                f"store={self._vector_store}  k={self._top_k}…[/cyan]",
             )
             provider = create_embedding_provider(
                 provider_name=self._provider,
@@ -305,30 +312,18 @@ class RetrievalApp(App[None]):
             )
             store = create_vector_store(vector_store_name=self._vector_store)
             model_info = provider.model_info
-
-            self.call_from_thread(
-                self._log_status,
-                f"[cyan]Embedding query: [italic]{query[:80]}[/italic]...[/cyan]",
-            )
             vector = provider.embed(query)
             if not vector:
                 self.call_from_thread(
-                    self._log_status,
-                    "[red]Failed to generate embedding — check provider credentials.[/red]",
+                    self._set_message,
+                    "[red]Embedding failed — check provider credentials.[/red]",
                 )
                 return
-
-            self.call_from_thread(
-                self._log_status,
-                f"[cyan]Searching top-{self._top_k} in "
-                f"[bold]{store.target_name(model_info)}[/bold]...[/cyan]",
-            )
             results = store.search(vector, top_k=self._top_k, embedding_model=model_info)
             self.call_from_thread(self._display_results, results, query)
-
         except Exception as exc:
             logger.exception("Search worker error")
-            self.call_from_thread(self._log_status, f"[red]Error during search: {exc}[/red]")
+            self.call_from_thread(self._set_message, f"[red]Error: {exc}[/red]")
         finally:
             self.call_from_thread(self._set_searching_state, False)
 
@@ -336,8 +331,8 @@ class RetrievalApp(App[None]):
     def _run_backup(self) -> None:
         """Run the vector store backup in a background thread."""
         self.call_from_thread(
-            self._log_status,
-            f"[yellow]Starting backup for store=[bold]{self._vector_store}[/bold]...[/yellow]",
+            self._set_message,
+            f"[yellow]Starting backup  store={self._vector_store}…[/yellow]",
         )
         try:
             from backup_vectorstore import BackupConfig, backup_vector_store
@@ -366,46 +361,44 @@ class RetrievalApp(App[None]):
             )
             stats = backup_vector_store(config)
             self.call_from_thread(
-                self._log_status,
-                f"[green]Backup complete: {stats.local_points} points "
-                f"→ {stats.output_path}[/green]",
+                self._set_message,
+                f"[green]Backup complete: {stats.local_points} points → {stats.output_path}[/green]",
             )
         except Exception as exc:
             logger.exception("Backup worker error")
-            self.call_from_thread(self._log_status, f"[red]Backup failed: {exc}[/red]")
+            self.call_from_thread(self._set_message, f"[red]Backup failed: {exc}[/red]")
 
     # ------------------------------------------------------------------
-    # UI state helpers (must be called from the main thread)
+    # UI state helpers (main thread only)
     # ------------------------------------------------------------------
 
-    def _log_status(self, message: str) -> None:
-        """Append a message to the status log panel."""
-        log_widget = self.query_one(f"#{STATUS_LOG_ID}", Log)
-        log_widget.write_line(message)
+    def _set_message(self, message: str) -> None:
+        """Update the single-line message bar."""
+        self.query_one(f"#{MESSAGE_BAR_ID}", Label).update(message)
 
     def _set_searching_state(self, searching: bool) -> None:
-        """Toggle button states while a search or backup is in progress."""
         search_btn = self.query_one(f"#{SEARCH_BUTTON_ID}", Button)
         backup_btn = self.query_one(f"#{BACKUP_BUTTON_ID}", Button)
         search_btn.disabled = searching
         backup_btn.disabled = searching
 
-    def _display_results(self, results: list[Movie], query: str) -> None:
-        """Replace the results panel contents with fresh movie cards."""
+    def _clear_results(self) -> None:
         results_panel = self.query_one(f"#{RESULTS_LIST_ID}", Vertical)
-
         for child in list(results_panel.children):
             child.remove()
 
+    def _display_results(self, results: list[Movie], query: str) -> None:
+        """Replace the results panel contents with fresh movie cards."""
+        self._clear_results()
+        results_panel = self.query_one(f"#{RESULTS_LIST_ID}", Vertical)
+
         if not results:
-            results_panel.mount(Static("[dim]No matching movies found for that query.[/dim]"))
-            self._log_status(
-                f"[yellow]No results for: [italic]{query[:80]}[/italic][/yellow]"
-            )
+            results_panel.mount(Static("[dim]No results found.[/dim]"))
+            self._set_message(f"[yellow]No results for: [italic]{query[:80]}[/italic][/yellow]")
             return
 
         cards: list[Any] = [MovieCard(i, movie) for i, movie in enumerate(results, start=1)]
         results_panel.mount(*cards)
-        self._log_status(
-            f"[green]Found {len(results)} result(s) for: [italic]{query[:80]}[/italic][/green]"
+        self._set_message(
+            f"[green]{len(results)} result(s) for: [italic]{query[:80]}[/italic][/green]"
         )

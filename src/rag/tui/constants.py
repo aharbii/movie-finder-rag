@@ -1,4 +1,4 @@
-"""Compile-time constants and widget IDs for the Retrieval TUI."""
+"""Compile-time constants, widget IDs, and slash-command help for the Retrieval TUI."""
 
 from __future__ import annotations
 
@@ -27,12 +27,29 @@ TOP_K_OPTIONS: list[tuple[str, int]] = [
     ("20", 20),
 ]
 
-PROVIDER_SELECT_ID = "provider-select"
-MODEL_SELECT_ID = "model-select"
-VECTOR_STORE_SELECT_ID = "vector-store-select"
-TOP_K_SELECT_ID = "top-k-select"
+PROVIDER_NAMES: set[str] = {v for _, v in PROVIDERS}
+VECTOR_STORE_NAMES: set[str] = {v for _, v in VECTOR_STORES}
+TOP_K_VALUES: set[int] = {v for _, v in TOP_K_OPTIONS}
+
+# Widget IDs
 SEARCH_INPUT_ID = "search-input"
 SEARCH_BUTTON_ID = "search-button"
 BACKUP_BUTTON_ID = "backup-button"
 RESULTS_LIST_ID = "results-list"
-STATUS_LOG_ID = "status-log"
+SETTINGS_BAR_ID = "settings-bar"
+MESSAGE_BAR_ID = "message-bar"
+
+COMMAND_HELP = """\
+[bold]Slash commands[/bold]
+
+  [cyan]/provider[/cyan] <name>   Set embedding provider
+                  [dim]openai · ollama · huggingface · sentence-transformers · google[/dim]
+  [cyan]/model[/cyan] <name>      Set embedding model (must match provider)
+  [cyan]/store[/cyan] <name>      Set vector store backend
+                  [dim]qdrant · chromadb · pinecone · pgvector[/dim]
+  [cyan]/topk[/cyan] <n>          Set number of results  [dim](3 · 5 · 10 · 15 · 20)[/dim]
+  [cyan]/clear[/cyan]             Clear the results panel
+  [cyan]/help[/cyan]              Show this message
+
+[dim]Any other text runs a semantic search.[/dim]\
+"""

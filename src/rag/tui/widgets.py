@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from textual.app import RenderResult
 from textual.widgets import Static
 
+from rag.config import DEFAULT_EMBEDDING_MODELS, EmbeddingProviderName, VectorStoreName
 from rag.models.movie import Movie
 
 
@@ -40,3 +42,40 @@ class MovieCard(Static):
     def card_content(self) -> str:
         """Return the rendered card markup as a plain string (for testing)."""
         return self._card_content
+
+
+class SettingsBar(Static):
+    """One-line status bar showing the active TUI configuration."""
+
+    def __init__(self) -> None:
+        super().__init__("", id="settings-bar")
+        self._provider: EmbeddingProviderName = "openai"
+        self._model: str = DEFAULT_EMBEDDING_MODELS["openai"]
+        self._store: VectorStoreName = "qdrant"
+        self._top_k: int = 5
+
+    def update_settings(
+        self,
+        provider: EmbeddingProviderName,
+        model: str,
+        store: VectorStoreName,
+        top_k: int,
+    ) -> None:
+        """Refresh the bar whenever a setting changes."""
+        self._provider = provider
+        self._model = model
+        self._store = store
+        self._top_k = top_k
+        self.update(self._render_line())
+
+    def render(self) -> RenderResult:
+        """Initial render."""
+        return self._render_line()
+
+    def _render_line(self) -> str:
+        return (
+            f"[dim]provider=[/dim][cyan]{self._provider}[/cyan]  "
+            f"[dim]model=[/dim][cyan]{self._model}[/cyan]  "
+            f"[dim]store=[/dim][cyan]{self._store}[/cyan]  "
+            f"[dim]top-k=[/dim][cyan]{self._top_k}[/cyan]"
+        )
