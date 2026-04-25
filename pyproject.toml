@@ -27,7 +27,6 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "qdrant-client>=1.17.1",
-    "textual>=0.80.0",
     "tqdm>=4.66.0",
 ]
 
@@ -35,6 +34,9 @@ dependencies = [
 local = [
     "sentence-transformers>=5.1.2",
     "torch>=2.8.0",
+]
+tui = [
+    "textual>=0.80.0",
 ]
 
 [dependency-groups]
@@ -45,6 +47,7 @@ dev = [
     { include-group = "test" },
     "pre-commit>=4.5.1",
     "detect-secrets>=1.5.0",
+    "textual>=0.80.0",
 ]
 
 [tool.uv]
