@@ -177,6 +177,9 @@ class RetrievalApp(App[None]):
     _vector_store: reactive[VectorStoreName] = reactive("qdrant")
     _top_k: reactive[int] = reactive(5)
 
+    # Tracks command IDs for the visible completion list by index
+    _completion_ids: list[str] = []
+
     def compose(self) -> ComposeResult:
         yield Header()
         with ScrollableContainer(id="results-scroll"), Vertical(id=RESULTS_LIST_ID):
@@ -244,20 +247,23 @@ class RetrievalApp(App[None]):
         if text.startswith("/"):
             needle = text.lower()
             completion.clear_options()
+            self._completion_ids = []
             for cmd_id, name, description in COMMAND_REGISTRY:
                 if needle in name or needle in description.lower():
                     line = Text()
                     line.append(f"{name:<35}", style="bold")
                     line.append(description, style="dim")
-                    completion.add_option(OptionList.Option(line, id=cmd_id))  # type: ignore[attr-defined]
-            completion.display = completion.option_count > 0
+                    completion.add_option(line)
+                    self._completion_ids.append(cmd_id)
+            completion.display = len(self._completion_ids) > 0
         else:
             completion.display = False
 
     @on(OptionList.OptionSelected, f"#{COMPLETION_LIST_ID}")
     def on_completion_selected(self, event: OptionList.OptionSelected) -> None:
-        cmd_id = str(event.option_id)
-        self._dispatch_command_id(cmd_id)
+        idx = event.option_index
+        if idx < len(self._completion_ids):
+            self._dispatch_command_id(self._completion_ids[idx])
         self.query_one(f"#{SEARCH_INPUT_ID}", TextArea).clear()
         self.query_one(f"#{COMPLETION_LIST_ID}", OptionList).display = False
         self.query_one(f"#{SEARCH_INPUT_ID}", TextArea).focus()
