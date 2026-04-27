@@ -37,6 +37,7 @@ class BackupConfig:
     collection_name: str
     output_root: Path
     batch_size: int
+    backup_format: str = "chromadb"
     embedding_provider: str | None = None
     embedding_model: str | None = None
     embedding_dimension: int | None = None
@@ -354,6 +355,14 @@ def backup() -> None:
 
 
 def backup_vector_store(config: BackupConfig) -> BackupStats:
+    """Back up the configured vector store collection into a Jenkins artifact."""
+    if config.backup_format != "chromadb":
+        raise ValueError(f"Unsupported backup format: {config.backup_format}")
+
+    return backup_chromadb_artifact(config)
+
+
+def backup_chromadb_artifact(config: BackupConfig) -> BackupStats:
     """Back up the configured vector store collection into a local ChromaDB artifact."""
     logger = logging.getLogger(__name__)
     source = build_backup_source(config)
@@ -474,6 +483,7 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
     )
     output_root = _env_or_default("BACKUP_OUTPUT_ROOT", str(BACKUP_ROOT))
     batch_size = int(_env_or_default("BACKUP_BATCH_SIZE", "1000"))
+    backup_format = _env_or_default("BACKUP_FORMAT", "chromadb")
     request_timeout_raw = _env_or_none("QDRANT_REQUEST_TIMEOUT") or _env_or_none("REQUEST_TIMEOUT")
     vector_store_url = _env_or_none("VECTOR_STORE_URL") or _env_or_none("QDRANT_URL")
     vector_store_api_key = _env_or_none("VECTOR_STORE_API_KEY") or _env_or_none("QDRANT_API_KEY_RW")
@@ -509,6 +519,12 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
         type=int,
         default=batch_size,
         help="Number of records to fetch per source batch.",
+    )
+    parser.add_argument(
+        "--backup-format",
+        choices=("chromadb",),
+        default=backup_format,
+        help="Backup artifact format. Defaults to a portable ChromaDB artifact.",
     )
     parser.add_argument(
         "--vector-store-url",
@@ -552,6 +568,7 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
         collection_name=args.collection_name,
         output_root=Path(args.output_root),
         batch_size=args.batch_size,
+        backup_format=args.backup_format,
         embedding_provider=_env_or_none("EMBEDDING_PROVIDER")
         or ingestion_outputs.get("EMBEDDING_PROVIDER"),
         embedding_model=_env_or_none("EMBEDDING_MODEL") or ingestion_outputs.get("EMBEDDING_MODEL"),

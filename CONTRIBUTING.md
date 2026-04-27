@@ -55,10 +55,11 @@ KAGGLE_API_TOKEN=KGAT_...
 ## Project Structure
 
 ```text
-rag_ingestion/
+movie-finder-rag/
 ├── src/
-│   └── rag/             # Package source
-├── scripts/             # Utility scripts (backup, retrieve)
+│   └── rag/             # Package source (embeddings, vectorstore, ingestion, config)
+├── tui/                 # Textual TUI for retrieval evaluation (tui.app, tui.widgets, tui.constants)
+├── scripts/             # Operational scripts (backup, cost-report, evaluate, launch_tui, retrieve)
 ├── tests/               # Unit tests
 ├── Dockerfile           # Multi-stage build (dev, builder, runtime)
 ├── docker-compose.yml   # Local development stack
@@ -124,10 +125,39 @@ Script-specific env fallbacks:
 
 Generated artifacts are written under `outputs/backups/chromadb/`.
 
+### Evaluate Qdrant retrieval
+
+The retrieval evaluator is operational tooling under `scripts/`; it is not part of the `src/rag`
+runtime package and is not unit-tested as application code. It is intended for post-ingest Jenkins
+validation and retroactive checks of existing Qdrant collections:
+
+```bash
+make qdrant-live-eval
+```
+
+The evaluator writes one artifact folder per collection under `outputs/reports/qdrant-live-eval/`.
+
 ### Run interactive retrieval app
 
 ```bash
 make retrieve
+```
+
+### Launch the Textual TUI
+
+The full Textual TUI (`tui/app.py`) provides slash-command navigation for switching providers,
+models, stores, and top-k, and displays cosine similarity scores alongside each result:
+
+```bash
+make tui
+```
+
+### Refresh the ingestion cost report
+
+After ingestion, regenerate `outputs/reports/cost-report.json` from `ingestion-outputs.env`:
+
+```bash
+make cost-report
 ```
 
 ---
@@ -193,12 +223,16 @@ Follow these rules:
 The Jenkins pipeline executes through the Docker Makefile to ensure environment parity between
 local and CI runs.
 
-| Stage            | Command / trigger                       | Notes                               |
-| ---------------- | --------------------------------------- | ----------------------------------- |
-| Lint + Typecheck | `make lint` + `make typecheck`          | PRs, `main`, tags                   |
-| Test             | `make test-coverage`                    | PRs, `main`, tags                   |
-| Ingest           | Manual `RUN_INGESTION=true`             | Parameterized Jenkins / Actions run |
-| Backup           | Manual `RUN_BACKUP=true` or post-ingest | Archives `outputs/backups/**`       |
+| Stage                 | Command / trigger                       | Notes                                                  |
+| --------------------- | --------------------------------------- | ------------------------------------------------------ |
+| Lint + Typecheck      | `make lint` + `make typecheck`          | PRs, `main`, tags                                      |
+| Test                  | `make test-coverage`                    | PRs, `main`, tags                                      |
+| Ingest                | Manual `RUN_INGESTION=true`             | Parameterized Jenkins / Actions run                    |
+| Cost report           | `make cost-report` (post-ingest)        | Writes `outputs/reports/cost-report.json`              |
+| Post-ingest validate  | `make validate` (post-ingest)           | Smoke-test query against the new collection            |
+| Qdrant live eval      | `make qdrant-live-eval` (post-ingest)   | Hit@k + similarity report; Qdrant only                 |
+| Backup                | Manual `RUN_BACKUP=true` or post-ingest | Archives `outputs/backups/**`                          |
+| Archive artifacts     | Automatic after ingest / backup         | All outputs downloadable from the Jenkins / Actions UI |
 
 Live CI operations must stay manual and parameterized. Secret handling is owned by the CI system:
 
@@ -211,11 +245,19 @@ Live CI operations must stay manual and parameterized. Secret handling is owned 
 
 ## Sharing Outputs With The Chain Team
 
-After a successful ingest, share these metadata values with the chain team:
+After a successful ingest, all relevant metadata is written to `ingestion-outputs.env` and archived
+as a Jenkins / GitHub Actions build artifact. Download it from the build page and share:
 
 ```text
 QDRANT_URL=<cloud-endpoint>
-QDRANT_COLLECTION_NAME=<new-collection>
+VECTOR_STORE_TARGET_NAME=<adr0008-collection-name>
+EMBEDDING_PROVIDER=openai
 EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_DIMENSION=3072
+INGESTION_TOTAL_TOKENS=<n>
+INGESTION_ESTIMATED_COST_USD=<n>
 ```
+
+The human-readable cost summary is also available as `outputs/reports/cost-report.json`.
+For Qdrant ingestion runs, `outputs/reports/qdrant-live-eval/` contains per-collection HTML
+reports and a `summary.json` with hit@k and mean cosine similarity metrics.

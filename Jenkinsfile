@@ -52,7 +52,12 @@ pipeline {
         booleanParam(
             name: 'RUN_BACKUP',
             defaultValue: false,
-            description: 'Run the backup utility and archive the generated artifact.'
+            description: 'Run the backup utility after validation.'
+        )
+        choice(
+            name: 'BACKUP_FORMAT',
+            choices: ['chromadb'],
+            description: 'Portable ChromaDB backup archived by Jenkins.'
         )
         choice(
             name: 'EMBEDDING_PROVIDER',
@@ -76,8 +81,8 @@ pipeline {
         )
         string(
             name: 'COLLECTION_PREFIX',
-            defaultValue: 'movies',
-            description: 'Qdrant collection prefix. Final target is resolved dynamically per ADR 0008.'
+            defaultValue: '',
+            description: 'Optional collection prefix override. Default is movies_<git sha8>.'
         )
         choice(
             name: 'VECTOR_STORE',
@@ -218,6 +223,7 @@ pipeline {
                 script {
                     configureRuntimeEnv()
                     sh 'make ingest'
+                    sh 'make cost-report'
                 }
             }
         }
@@ -240,6 +246,16 @@ pipeline {
                 script {
                     configureRuntimeEnv()
                     sh 'make validate'
+                    sh '''
+                        set -a
+                        . ./ingestion-outputs.env
+                        set +a
+                        if [ "${VECTOR_STORE}" = "qdrant" ]; then
+                            make qdrant-live-eval QDRANT_EVAL_ARGS="--collection-name ${VECTOR_STORE_TARGET_NAME} --provider ${EMBEDDING_PROVIDER} --model ${EMBEDDING_MODEL}"
+                        else
+                            echo "Skipping Qdrant retrieval evaluation for VECTOR_STORE=${VECTOR_STORE}."
+                        fi
+                    '''
                 }
             }
         }
@@ -296,8 +312,10 @@ def configureRuntimeEnv() {
     env.EMBEDDING_MODEL = params.EMBEDDING_MODEL ?: 'text-embedding-3-large'
     env.EMBEDDING_DIMENSIONS = params.EMBEDDING_DIMENSIONS ?: ''
     env.OLLAMA_URL = params.OLLAMA_URL ?: env.OLLAMA_URL
-    env.QDRANT_COLLECTION_PREFIX = params.COLLECTION_PREFIX ?: 'movies'
+    def sha8 = env.GIT_COMMIT ? env.GIT_COMMIT.take(8) : "manual${env.BUILD_NUMBER}"
+    env.QDRANT_COLLECTION_PREFIX = params.COLLECTION_PREFIX?.trim() ? params.COLLECTION_PREFIX : "movies_${sha8}"
     env.VECTOR_STORE = params.VECTOR_STORE ?: 'qdrant'
+    env.BACKUP_FORMAT = params.BACKUP_FORMAT ?: 'chromadb'
     env.VALIDATION_QUERY = params.VALIDATION_QUERY ?: 'A time-travel movie with a scientist and a DeLorean'
     env.CHROMADB_PERSIST_PATH = params.CHROMADB_PERSIST_PATH ?: env.CHROMADB_PERSIST_PATH ?: 'outputs/chromadb/local'
     env.PINECONE_INDEX_NAME = params.PINECONE_INDEX_NAME ?: env.PINECONE_INDEX_NAME ?: 'movie-finder-rag'

@@ -28,7 +28,8 @@
 # Artifact contract:
 # - Ingestion emits `ingestion-outputs.env`, `outputs/reports/cost-report.json`,
 #   and `outputs/reports/skipped-movies.json`.
-# - Validation emits `outputs/reports/validation-report.json`.
+# - Validation emits `outputs/reports/validation-report.json` and, for Qdrant,
+#   `outputs/reports/qdrant-live-eval/**`.
 # - Backup emits a portable ChromaDB artifact under `outputs/backups/**`.
 # =============================================================================
 
@@ -256,6 +257,9 @@ jobs:
       - name: Run ingestion
         run: make ingest
 
+      - name: Generate cost report
+        run: make cost-report
+
       - name: Upload ingestion outputs
         if: always()
         uses: actions/upload-artifact@v4
@@ -302,15 +306,32 @@ jobs:
       - name: Initialize
         run: make init
 
+      - name: Download ingestion outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: ingestion-outputs
+          path: .
+
       - name: Run validation
         run: make validate
+
+      - name: Run Qdrant retrieval evaluation
+        if: github.event.inputs.vector_store == 'qdrant'
+        shell: bash
+        run: |
+          set -a
+          . ./ingestion-outputs.env
+          set +a
+          make qdrant-live-eval QDRANT_EVAL_ARGS="--collection-name ${VECTOR_STORE_TARGET_NAME} --provider ${EMBEDDING_PROVIDER} --model ${EMBEDDING_MODEL}"
 
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: validation-results
-          path: outputs/reports/validation-report.json
+          path: |
+            outputs/reports/validation-report.json
+            outputs/reports/qdrant-live-eval/**
           if-no-files-found: ignore
 
   # -------------------------------------------------------------------------- #
@@ -353,6 +374,13 @@ jobs:
       - name: Initialize
         run: make init
 
+      - name: Download ingestion outputs
+        if: github.event.inputs.run_ingestion == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: ingestion-outputs
+          path: .
+
       - name: Run backup
         run: make backup
 
@@ -361,5 +389,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vector-store-backup
-          path: outputs/backups/
+          path: |
+            outputs/backups/
+            outputs/reports/
+            ingestion-outputs.env
           if-no-files-found: ignore

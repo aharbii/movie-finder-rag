@@ -42,6 +42,7 @@ repos:
           - pydantic
           - pydantic-settings
           - pytest
+          - textual>=0.80.0
         args: [--config-file=pyproject.toml]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit

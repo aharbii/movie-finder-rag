@@ -21,13 +21,13 @@ def interactive_retrieve() -> None:
     print(f"🔗 Connected target: '{target_name}'")
     print(f"🤖 Embedding Provider: {settings.embedding_provider.upper()}")
     print(f"📦 Model: {model_info.name} ({model_info.dimension}d)")
-    print("\n💡 Type 'exit' or 'quit' to end the session.")
+    print("\n💡 Type '/exit' or '/quit' to end the session.")
 
     while True:
         try:
             print("\n" + "-" * 40)
             query = input("🔍 Enter your movie search query: ").strip()
-            if query.lower() in {"exit", "quit"}:
+            if query.lower() in {"/exit", "/quit"}:
                 break
             if not query:
                 continue
