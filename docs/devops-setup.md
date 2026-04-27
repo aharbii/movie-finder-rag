@@ -18,8 +18,9 @@ This repo keeps the original operational split:
 | `EMBEDDING_MODEL` | Selects the provider-specific embedding model |
 | `EMBEDDING_DIMENSIONS` | Optional output dimension override |
 | `EMBEDDING_API_KEY` | Optional override for OpenAI, Google, or Ollama cloud |
+| `BACKUP_FORMAT` | Backup format archived by Jenkins, currently `chromadb` |
 | `OLLAMA_URL` | Docker-reachable Ollama URL when `EMBEDDING_PROVIDER=ollama` |
-| `COLLECTION_PREFIX` | Prefix used for ADR 0008 target naming |
+| `COLLECTION_PREFIX` | Optional prefix override; default is `movies_<git sha8>` |
 | `VECTOR_STORE` | Selects the ingestion backend |
 | `VECTOR_STORE_URL` | Optional qdrant URL override |
 | `VECTOR_STORE_API_KEY` | Optional qdrant or pinecone API key override |
@@ -52,9 +53,11 @@ This repo keeps the original operational split:
 
 ## Backup Scope
 
-Portable backup is implemented for every supported source backend: `qdrant`, `chromadb`,
-`pinecone`, and `pgvector`. Every backup run writes a ChromaDB artifact under `outputs/backups/`
-plus a manifest that records the source backend and the embedding runtime metadata.
+The Jenkins backup path uses `BACKUP_FORMAT=chromadb`: the job exports the configured source
+collection into a portable ChromaDB directory under `outputs/backups/<backend>/<collection>/`.
+Jenkins archives that directory directly so the backup is downloadable from the Jenkins build.
+Portable backup is available for every supported source backend: `qdrant`, `chromadb`, `pinecone`,
+and `pgvector`.
 
 ---
 
@@ -66,4 +69,5 @@ After manual ingest or backup runs, the job archives:
 - `outputs/reports/cost-report.json`
 - `outputs/reports/skipped-movies.json`
 - `outputs/reports/validation-report.json`
+- `outputs/reports/qdrant-live-eval/**`
 - `outputs/backups/**`

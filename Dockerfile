@@ -28,7 +28,7 @@ RUN python -m venv /opt/venv
 
 ENV PATH="/opt/venv/bin:$PATH" \
     VIRTUAL_ENV="/opt/venv" \
-    PYTHONPATH="/workspace/src"
+    PYTHONPATH="/workspace/src:/workspace"
 
 COPY pyproject.toml uv.lock ./
 

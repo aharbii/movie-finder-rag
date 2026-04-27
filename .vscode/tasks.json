@@ -98,6 +98,13 @@
       "command": "make check",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "rag: tui",
+      "type": "shell",
+      "command": "make tui",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" }
     }
   ]
 }

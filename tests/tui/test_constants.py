@@ -1,11 +1,12 @@
-"""Tests for rag.tui.constants."""
+"""Tests for tui.constants."""
 
 from __future__ import annotations
 
-from rag.tui.constants import (
-    COMMAND_REGISTRY,
+from tui.constants import (
+    PROVIDER_MODELS,
     PROVIDER_NAMES,
     PROVIDERS,
+    TOP_COMMANDS,
     TOP_K_OPTIONS,
     TOP_K_VALUES,
     VECTOR_STORE_NAMES,
@@ -45,24 +46,22 @@ def test_providers_values_are_valid_provider_names() -> None:
         assert value in valid
 
 
-def test_command_registry_has_all_providers() -> None:
-    registry_names = {name for _, name, _ in COMMAND_REGISTRY}
+def test_provider_models_covers_all_providers() -> None:
     for _, provider in PROVIDERS:
-        assert f"/provider {provider}" in registry_names
+        assert provider in PROVIDER_MODELS
+        assert len(PROVIDER_MODELS[provider]) >= 1
 
 
-def test_command_registry_has_all_stores() -> None:
-    registry_names = {name for _, name, _ in COMMAND_REGISTRY}
-    for _, store in VECTOR_STORES:
-        assert f"/store {store}" in registry_names
+def test_top_commands_has_all_expected_commands() -> None:
+    ids = {item.item_id for item in TOP_COMMANDS}
+    assert "cmd_provider" in ids
+    assert "cmd_store" in ids
+    assert "cmd_topk" in ids
+    assert "cmd_backup" in ids
+    assert "cmd_help" in ids
+    assert "cmd_quit" in ids
 
 
-def test_command_registry_has_quit_and_help() -> None:
-    registry_names = {name for _, name, _ in COMMAND_REGISTRY}
-    assert "/quit" in registry_names
-    assert "/help" in registry_names
-
-
-def test_command_registry_ids_are_unique() -> None:
-    ids = [cmd_id for cmd_id, _, _ in COMMAND_REGISTRY]
+def test_top_commands_ids_are_unique() -> None:
+    ids = [item.item_id for item in TOP_COMMANDS]
     assert len(ids) == len(set(ids))

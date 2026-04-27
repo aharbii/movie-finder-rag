@@ -21,7 +21,7 @@
 .PHONY: help init build setup clean clean-docker \
 	editor-up editor-down ci-down shell logs up down  run run-dev \
 	lint format fix typecheck test test-coverage pre-commit detect-secrets check \
-	backup retrieve validate migrate-legacy-qdrant-collection
+	backup cost-report qdrant-live-eval retrieve validate migrate-legacy-qdrant-collection tui
 
 
 .DEFAULT_GOAL := help
@@ -40,6 +40,7 @@ COVERAGE_XML ?= reports/coverage.xml
 COVERAGE_HTML ?= reports/htmlcov
 JUNIT_XML ?= reports/junit.xml
 BACKUP_ARGS ?=
+QDRANT_EVAL_ARGS ?=
 MIGRATE_ARGS ?=
 
 # ---------------------------------------------------------------------------
@@ -98,7 +99,10 @@ help:
 	@echo ""
 	@echo "  Apps"
 	@echo "    backup         Runs the Docker-backed backup utility and writes artifacts under outputs/"
-	@echo "    retrieve       Runs an interactive app to validate the retrieval logic"
+	@echo "    cost-report    Refreshes outputs/reports/cost-report.json from ingestion outputs"
+	@echo "    qdrant-live-eval  Evaluates existing Qdrant collections and writes HTML/JSON reports"
+	@echo "    retrieve       Runs the interactive CLI to validate retrieval logic"
+	@echo "    tui            Launches the full Textual TUI for retrieval evaluation"
 	@echo "    validate       Runs the post-ingest validation script"
 	@echo "    migrate-legacy-qdrant-collection  Backs up and migrates a legacy Qdrant collection into the ADR-style name"
 	@echo ""
@@ -188,8 +192,17 @@ ingest:
 backup:
 	$(call exec_or_run,python scripts/backup_vectorstore.py $(BACKUP_ARGS))
 
+cost-report:
+	$(call exec_or_run,python scripts/generate_cost_report.py)
+
+qdrant-live-eval:
+	$(call exec_or_run,python scripts/evaluate_qdrant_collections.py $(QDRANT_EVAL_ARGS))
+
 retrieve:
 	$(call exec_or_run,python scripts/retrieve.py)
+
+tui:
+	$(call exec_or_run,python scripts/launch_tui.py)
 
 validate:
 	$(call exec_or_run,python scripts/validate_ingestion.py)

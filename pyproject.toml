@@ -78,7 +78,7 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.13"
-mypy_path = "src:tests:scripts"
+mypy_path = "src:scripts:."
 strict = true
 explicit_package_bases = true
 namespace_packages = true
@@ -89,12 +89,12 @@ plugins = ["pydantic.mypy"]
 
 
 [[tool.mypy.overrides]]
-module = ["rag.tui.*"]
+module = ["tui.*"]
 warn_unused_ignores = false
 
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
 addopts = ["-v", "--tb=short"]
 
