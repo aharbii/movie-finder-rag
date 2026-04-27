@@ -22,9 +22,20 @@ def test_infer_embedding_dimension() -> None:
     assert infer_embedding_dimension("openai", "text-embedding-ada-002") == 1536
     assert infer_embedding_dimension("openai", "unknown-large-model") == 3072
     assert infer_embedding_dimension("openai", "unknown-small-model") == 1536
+    assert infer_embedding_dimension("openai", "mystery-model") == 0
     assert infer_embedding_dimension("google", "text-embedding-004") == 768
     assert infer_embedding_dimension("google", "unknown") == 768
     assert infer_embedding_dimension(cast("Any", "unknown"), "unknown") == 0
+
+
+def test_shape_validator_accepts_valid_pinecone_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VECTOR_STORE", "pinecone")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "huggingface")
+    monkeypatch.setenv("PINECONE_API_KEY", "test-key")
+    monkeypatch.setenv("PINECONE_INDEX_NAME", "valid-index-123")
+
+    config = RAGConfig()
+    assert config.pinecone_index_name == "valid-index-123"
 
 
 def test_provider_default_model_is_injected(monkeypatch: pytest.MonkeyPatch) -> None:

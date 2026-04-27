@@ -373,6 +373,37 @@ def test_pinecone_search(
         assert results[0].id == sample_movie.id
 
 
+def test_pinecone_search_no_metadata(
+    model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "pinecone_api_key", "test")
+    mock_pinecone = MagicMock()
+    with patch.dict(
+        sys.modules, {"pinecone": MagicMock(Pinecone=mock_pinecone, ServerlessSpec=MagicMock())}
+    ):
+        store = PineconeVectorStore()
+        mock_index = MagicMock()
+        mock_index.query.return_value = {"matches": [{"something": "else"}]}
+        store._index = mock_index
+        results = store.search([0.1], 5, model_metadata)
+        assert len(results) == 0
+
+
+def test_pinecone_get_index_cached_host(
+    model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "pinecone_api_key", "test")
+    monkeypatch.setattr(settings, "pinecone_index_host", "cached-host")
+    mock_pinecone = MagicMock()
+    with patch.dict(
+        sys.modules, {"pinecone": MagicMock(Pinecone=mock_pinecone, ServerlessSpec=MagicMock())}
+    ):
+        store = PineconeVectorStore()
+        index = store._get_index(model_metadata)
+        assert index is not None
+        cast(MagicMock, store.client.describe_index).assert_not_called()
+
+
 def test_pinecone_get_index_no_host(
     model_metadata: EmbeddingModelMetadata, monkeypatch: pytest.MonkeyPatch
 ) -> None:

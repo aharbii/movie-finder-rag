@@ -177,6 +177,42 @@ def test_ollama_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # --- OpenAIEmbeddingProvider Tests ---
+def test_ollama_provider_model_info_skip_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "embedding_dimensions", 1024)
+    fake_ollama = SimpleNamespace(Client=MagicMock())
+    with patch.dict(sys.modules, {"ollama": fake_ollama}):
+        provider = OllamaEmbeddingProvider(model="test-model")
+        assert provider.model_info.dimension == 1024
+
+
+def test_ollama_provider_model_info_probe_empty_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    mock_client = MagicMock()
+    mock_client.embed.return_value = {"embeddings": []}
+    fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
+    with (
+        patch.dict(sys.modules, {"ollama": fake_ollama}),
+        patch("rag.embeddings.ollama_provider.infer_embedding_dimension", return_value=0),
+    ):
+        provider = OllamaEmbeddingProvider(model="test-model")
+        with pytest.raises(ValueError, match="Unknown Ollama embedding dimension"):
+            _ = provider.model_info
+
+
+def test_ollama_provider_embed_batch_no_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    mock_client = MagicMock()
+    mock_client.embed.return_value = {"embeddings": [[0.1]], "prompt_eval_count": 1}
+    fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
+    with patch.dict(sys.modules, {"ollama": fake_ollama}):
+        provider = OllamaEmbeddingProvider(model="test-model")
+        assert provider.embed("test") == [0.1]
+        mock_client.embed.assert_called_once_with(
+            model="test-model",
+            input=["test"],
+        )
+
+
 def test_openai_provider_passes_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test-key")
     monkeypatch.setattr(settings, "embedding_dimensions", 1024)
@@ -352,6 +388,18 @@ def test_sentence_transformers_provider_model_info_unknown(monkeypatch: pytest.M
         provider = SentenceTransformersEmbeddingProvider(model="unknown")
         with pytest.raises(ValueError, match="Unable to resolve embedding dimension"):
             _ = provider.model_info
+
+
+def test_sentence_transformers_provider_model_info_from_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    mock_model = MagicMock()
+    mock_model.get_sentence_embedding_dimension.return_value = 768
+    fake_st = SimpleNamespace(SentenceTransformer=MagicMock(return_value=mock_model))
+    with patch.dict(sys.modules, {"sentence_transformers": fake_st}):
+        provider = SentenceTransformersEmbeddingProvider(model="some-model")
+        assert provider.model_info.dimension == 768
 
 
 def test_sentence_transformers_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
