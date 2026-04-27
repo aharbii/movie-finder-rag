@@ -183,6 +183,9 @@ clean:
 	$(call exec_or_run,find . -type d -name ".ruff_cache" -not -path "./.git/*" -exec rm -rf {} + 2>/dev/null || true)
 	$(call exec_or_run,find . -name "*.egg-info" -not -path "./.git/*" -exec rm -rf {} + 2>/dev/null || true)
 	$(call exec_or_run,rm -rf reports/)
+	$(call exec_or_run,rm -rf outputs/)
+	$(call exec_or_run,rm -f ingestion-outputs.env)
+	$(call exec_or_run,rm -rf dataset/*)
 	@echo "Clean complete."
 
 clean-docker: ci-down
