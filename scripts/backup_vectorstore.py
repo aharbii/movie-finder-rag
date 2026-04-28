@@ -41,8 +41,8 @@ class BackupConfig:
     embedding_provider: str | None = None
     embedding_model: str | None = None
     embedding_dimension: int | None = None
-    vector_store_url: str | None = None
-    vector_store_api_key: str | None = None
+    source_endpoint: str | None = None
+    source_api_key: str | None = None
     request_timeout: int | None = None
     chromadb_persist_path: str | None = None
     pinecone_index_name: str | None = None
@@ -78,15 +78,15 @@ class QdrantBackupSource:
     """Qdrant backup adapter used by the current script."""
 
     def __init__(self, config: BackupConfig) -> None:
-        if not config.vector_store_url:
-            raise ValueError("Qdrant backup requires VECTOR_STORE_URL or QDRANT_URL.")
-        if not config.vector_store_api_key:
-            raise ValueError("Qdrant backup requires VECTOR_STORE_API_KEY or QDRANT_API_KEY_RW.")
+        if not config.source_endpoint:
+            raise ValueError("Qdrant backup requires QDRANT_URL.")
+        if not config.source_api_key:
+            raise ValueError("Qdrant backup requires QDRANT_API_KEY_RW.")
 
         self.config = config
         self.client = QdrantClient(
-            url=config.vector_store_url,
-            api_key=config.vector_store_api_key,
+            url=config.source_endpoint,
+            api_key=config.source_api_key,
             timeout=config.request_timeout,
         )
 
@@ -187,8 +187,8 @@ class PineconeBackupSource:
     """Pinecone backup adapter used for namespace-level exports."""
 
     def __init__(self, config: BackupConfig) -> None:
-        if not config.vector_store_api_key:
-            raise ValueError("Pinecone backup requires PINECONE_API_KEY or VECTOR_STORE_API_KEY.")
+        if not config.source_api_key:
+            raise ValueError("Pinecone backup requires PINECONE_API_KEY.")
         if not config.pinecone_index_name:
             raise ValueError("Pinecone backup requires PINECONE_INDEX_NAME.")
 
@@ -200,8 +200,8 @@ class PineconeBackupSource:
             ) from exc
 
         self.config = config
-        self.client = Pinecone(api_key=config.vector_store_api_key)
-        self.index_host = config.pinecone_index_host or config.vector_store_url
+        self.client = Pinecone(api_key=config.source_api_key)
+        self.index_host = config.pinecone_index_host or config.source_endpoint
         self.index_name = config.pinecone_index_name
         self.namespace = config.collection_name
         self.index = self._get_index()
@@ -476,17 +476,20 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
     collection_name = (
         _env_or_none("BACKUP_COLLECTION_NAME")
         or _env_or_none("VECTOR_STORE_TARGET_NAME")
-        or _env_or_none("QDRANT_COLLECTION_NAME")
+        or _env_or_none("VECTOR_COLLECTION_PREFIX")
         or ingestion_outputs.get("VECTOR_STORE_TARGET_NAME")
-        or ingestion_outputs.get("QDRANT_COLLECTION_NAME")
+        or ingestion_outputs.get("VECTOR_COLLECTION_PREFIX")
         or "movies"
     )
     output_root = _env_or_default("BACKUP_OUTPUT_ROOT", str(BACKUP_ROOT))
     batch_size = int(_env_or_default("BACKUP_BATCH_SIZE", "1000"))
     backup_format = _env_or_default("BACKUP_FORMAT", "chromadb")
     request_timeout_raw = _env_or_none("QDRANT_REQUEST_TIMEOUT") or _env_or_none("REQUEST_TIMEOUT")
-    vector_store_url = _env_or_none("VECTOR_STORE_URL") or _env_or_none("QDRANT_URL")
-    vector_store_api_key = _env_or_none("VECTOR_STORE_API_KEY") or _env_or_none("QDRANT_API_KEY_RW")
+    source_endpoint = _env_or_none("QDRANT_URL")
+    source_api_key = _env_or_none("QDRANT_API_KEY_RW")
+    if vector_store == "pinecone":
+        source_endpoint = _env_or_none("PINECONE_INDEX_HOST")
+        source_api_key = _env_or_none("PINECONE_API_KEY")
     embedding_dimension = _env_or_none("EMBEDDING_DIMENSION") or ingestion_outputs.get(
         "EMBEDDING_DIMENSION"
     )
@@ -527,14 +530,14 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
         help="Backup artifact format. Defaults to a portable ChromaDB artifact.",
     )
     parser.add_argument(
-        "--vector-store-url",
-        default=vector_store_url,
-        help="Vector store endpoint URL.",
+        "--source-endpoint",
+        default=source_endpoint,
+        help="Provider-specific source endpoint URL.",
     )
     parser.add_argument(
-        "--vector-store-api-key",
-        default=vector_store_api_key,
-        help="Vector store API key.",
+        "--source-api-key",
+        default=source_api_key,
+        help="Provider-specific source API key.",
     )
     parser.add_argument(
         "--chromadb-persist-path",
@@ -573,8 +576,8 @@ def load_config(argv: list[str] | None = None) -> BackupConfig:
         or ingestion_outputs.get("EMBEDDING_PROVIDER"),
         embedding_model=_env_or_none("EMBEDDING_MODEL") or ingestion_outputs.get("EMBEDDING_MODEL"),
         embedding_dimension=int(embedding_dimension) if embedding_dimension else None,
-        vector_store_url=args.vector_store_url,
-        vector_store_api_key=args.vector_store_api_key,
+        source_endpoint=args.source_endpoint,
+        source_api_key=args.source_api_key,
         request_timeout=int(request_timeout_raw) if request_timeout_raw else None,
         chromadb_persist_path=args.chromadb_persist_path,
         pinecone_index_name=args.pinecone_index_name,

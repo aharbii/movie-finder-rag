@@ -11,7 +11,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider):
     def __init__(self, model: str | None = None) -> None:
         self.logger = get_logger(self.__class__.__name__)
         self.model = model or settings.embedding_model
-        self.dimensions = settings.embedding_dimensions
+        self.dimensions = settings.embedding_dimension_override
         self._usage = EmbeddingModelUsage()
 
         try:

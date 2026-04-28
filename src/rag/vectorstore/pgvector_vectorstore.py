@@ -29,7 +29,7 @@ class PGVectorStore(VectorStore):
         self._register_vector = register_vector
 
     def target_name(self, embedding_model: EmbeddingModelMetadata) -> str:
-        return resolve_collection_name(settings.qdrant_collection_prefix, embedding_model)
+        return resolve_collection_name(settings.vector_collection_prefix, embedding_model)
 
     def count(self, embedding_model: EmbeddingModelMetadata) -> int:
         table_name = self._table_name(embedding_model)

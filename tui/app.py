@@ -373,7 +373,7 @@ class RetrievalApp(App[None]):
         results: dict[str, bool | None] = {}
 
         # Ollama — probe /api/tags; include Bearer token if OLLAMA_API_KEY is set
-        ollama_base = (os.getenv("OLLAMA_URL") or "http://localhost:11434").rstrip("/")
+        ollama_base = (os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").rstrip("/")
         ollama_key = os.getenv("OLLAMA_API_KEY", "")
         _ollama_req = urllib.request.Request(f"{ollama_base}/api/tags")  # noqa: S310
         if ollama_key:
@@ -386,7 +386,7 @@ class RetrievalApp(App[None]):
 
         # Qdrant — cloud instances require an API key; local instances are probed via HTTP
         qdrant_url = os.getenv("QDRANT_URL", "")
-        qdrant_key = os.getenv("QDRANT_API_KEY_RW") or os.getenv("QDRANT_API_KEY")
+        qdrant_key = os.getenv("QDRANT_API_KEY_RW")
         _is_local = not qdrant_url or any(
             h in qdrant_url for h in ("localhost", "127.0.0.1", "::1")
         )
@@ -426,7 +426,7 @@ class RetrievalApp(App[None]):
 
         dim = infer_embedding_dimension(self._provider, self._model)
         model_info = EmbeddingModelMetadata(name=self._model, dimension=dim, cost_per_1k_tokens=0.0)
-        name = resolve_collection_name(_settings.qdrant_collection_prefix, model_info)
+        name = resolve_collection_name(_settings.vector_collection_prefix, model_info)
         self._apply_collection_name(name)
 
     def _apply_collection_name(self, name: str) -> None:
@@ -487,8 +487,16 @@ class RetrievalApp(App[None]):
                 embedding_provider=self._provider,
                 embedding_model=self._model,
                 embedding_dimension=model_info.dimension,
-                vector_store_url=settings.vector_store_url or settings.qdrant_url,
-                vector_store_api_key=settings.vector_store_api_key or settings.qdrant_api_key_rw,
+                source_endpoint=(
+                    settings.pinecone_index_host
+                    if self._vector_store == "pinecone"
+                    else settings.qdrant_url
+                ),
+                source_api_key=(
+                    settings.pinecone_api_key
+                    if self._vector_store == "pinecone"
+                    else settings.qdrant_api_key_rw
+                ),
                 chromadb_persist_path=settings.chromadb_persist_path,
                 pinecone_index_name=settings.pinecone_index_name,
                 pinecone_index_host=settings.pinecone_index_host,

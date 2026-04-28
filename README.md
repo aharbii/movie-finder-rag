@@ -23,7 +23,7 @@ ADR 0008 contract:
 - Embedding runtime is environment-driven via `EMBEDDING_PROVIDER` and `EMBEDDING_MODEL`.
 - Heavy local SDKs are installed only when `WITH_PROVIDERS=local`.
 - Final target name is resolved as
-  `{QDRANT_COLLECTION_PREFIX}_{sanitized_model}_{dimension}`.
+  `{VECTOR_COLLECTION_PREFIX}_{sanitized_model}_{dimension}`.
 - Query-time and ingestion-time embeddings must still be coordinated with `chain/`.
 
 ---
@@ -115,7 +115,7 @@ The canonical embedding settings are:
 | --- | --- | --- |
 | `EMBEDDING_PROVIDER` | Yes | `openai`, `ollama`, `huggingface`, `sentence-transformers`, or `google` |
 | `EMBEDDING_MODEL` | Yes | Model identifier for the selected provider |
-| `EMBEDDING_DIMENSIONS` | No | Optional dimension override for providers that support it |
+| `EMBEDDING_DIMENSION` | No | Optional dimension override for providers that support it |
 | `WITH_PROVIDERS` | No | Docker build extra, usually `local` for sentence-transformers + torch |
 
 Provider-specific credentials:
@@ -124,7 +124,7 @@ Provider-specific credentials:
 | --- | --- | --- |
 | `OPENAI_API_KEY` | `EMBEDDING_PROVIDER=openai` | OpenAI embeddings API key |
 | `GOOGLE_API_KEY` | `EMBEDDING_PROVIDER=google` | Google embeddings API key |
-| `OLLAMA_URL` | `EMBEDDING_PROVIDER=ollama` | Ollama base URL, local or cloud |
+| `OLLAMA_BASE_URL` | `EMBEDDING_PROVIDER=ollama` | Ollama base URL, local or cloud |
 | `OLLAMA_API_KEY` | Optional | Required for Ollama cloud |
 | `SENTENCE_TRANSFORMERS_CACHE_DIR` | Optional | Cache directory for local HuggingFace models |
 
@@ -135,9 +135,12 @@ Provider-specific credentials:
 | Variable | Required | Description |
 | --- | --- | --- |
 | `VECTOR_STORE` | Yes | `qdrant`, `chromadb`, `pinecone`, or `pgvector` |
-| `QDRANT_COLLECTION_PREFIX` | Yes | Prefix used for ADR 0008 target naming |
-| `VECTOR_STORE_URL` | No | Generic qdrant backup endpoint override |
-| `VECTOR_STORE_API_KEY` | No | Generic qdrant or pinecone backup API key override |
+| `VECTOR_COLLECTION_PREFIX` | Yes | Prefix used for ADR 0008 target naming |
+| `QDRANT_URL` | If qdrant | Qdrant endpoint |
+| `QDRANT_API_KEY_RW` | If qdrant | Qdrant write-capable key |
+| `PINECONE_INDEX_HOST` | If pinecone | Pinecone host |
+| `PINECONE_API_KEY` | If pinecone | Pinecone API key |
+| `PGVECTOR_DSN` | If pgvector | pgvector PostgreSQL DSN |
 
 Backend-specific settings:
 
@@ -203,10 +206,10 @@ settings directly:
 
 - `EMBEDDING_PROVIDER`
 - `EMBEDDING_MODEL`
-- `EMBEDDING_DIMENSIONS`
+- `EMBEDDING_DIMENSION`
 - `EMBEDDING_API_KEY`
 - `VECTOR_STORE`
-- `OLLAMA_URL`
+- `OLLAMA_BASE_URL`
 - `CHROMADB_PERSIST_PATH`
 - `PINECONE_INDEX_NAME`
 - `PINECONE_INDEX_HOST`

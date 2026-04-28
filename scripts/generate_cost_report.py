@@ -14,7 +14,7 @@ def main() -> None:
         "embedding_dimension": _to_int(values.get("EMBEDDING_DIMENSION")),
         "vector_store": values.get("VECTOR_STORE"),
         "target_name": values.get("VECTOR_STORE_TARGET_NAME"),
-        "collection_name": values.get("QDRANT_COLLECTION_NAME"),
+        "collection_name": values.get("VECTOR_COLLECTION_PREFIX"),
         "prompt_tokens": _to_int(values.get("INGESTION_PROMPT_TOKENS")),
         "total_tokens": _to_int(values.get("INGESTION_TOTAL_TOKENS")),
         "estimated_cost_usd": _to_float(values.get("INGESTION_ESTIMATED_COST_USD")),

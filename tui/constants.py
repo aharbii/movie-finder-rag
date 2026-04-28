@@ -45,7 +45,7 @@ PROVIDER_MODELS: dict[EmbeddingProviderName, list[tuple[str, str]]] = {
     "openai": [
         ("text-embedding-3-large", "3072-dim · recommended"),
         ("text-embedding-3-small", "1536-dim · lighter"),
-        ("text-embedding-ada-002", "1536-dim · legacy"),
+        ("text-embedding-ada-002", "1536-dim · older OpenAI model"),
     ],
     "ollama": [
         ("nomic-embed-text:latest", "768-dim"),

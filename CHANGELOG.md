@@ -40,7 +40,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `backup_vector_store` dispatcher so the Makefile target and CI remain backend-agnostic.
 - `Jenkinsfile` — added `BACKUP_FORMAT` parameter; `make cost-report` called in Ingest stage;
   `make qdrant-live-eval` called in Post-Ingest Validate stage (gated on `VECTOR_STORE=qdrant`);
-  `QDRANT_COLLECTION_PREFIX` defaults to `movies_<git sha8>` to prevent cross-run collection
+  `VECTOR_COLLECTION_PREFIX` defaults to `movies_<git sha8>` to prevent cross-run collection
   collisions; `BACKUP_FORMAT` wired through `configureRuntimeEnv()`.
 - `docs/devops-setup.md` — added `BACKUP_FORMAT` parameter row and expanded Archived Artifacts
   section to list all outputs: `ingestion-outputs.env`, `cost-report.json`, `skipped-movies.json`,
@@ -83,7 +83,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `resolve_collection_name` from `rag.vectorstore.naming` directly, matching the exact naming
   path used during ingestion; previously it attempted to instantiate a full provider + store
   object and could silently produce wrong names if the provider SDK was absent.
-- `tui/app.py` — Ollama connection probe now reads `OLLAMA_URL` (not `OLLAMA_HOST`) and
+- `tui/app.py` — Ollama connection probe now reads `OLLAMA_BASE_URL` and
   attaches `Authorization: Bearer <OLLAMA_API_KEY>` when the env var is set.
 - `.vscode/launch.json` — TUI launch configuration corrected to reference
   `scripts/launch_tui.py` (was `scripts/tui.py`).

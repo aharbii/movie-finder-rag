@@ -47,21 +47,21 @@ def test_provider_default_model_is_injected(monkeypatch: pytest.MonkeyPatch) -> 
     assert config.embedding_model == DEFAULT_EMBEDDING_MODELS["huggingface"]
 
 
-def test_collection_prefix_normalizes_legacy_value(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_collection_prefix_normalizes_model_value(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
     monkeypatch.setenv("EMBEDDING_PROVIDER", "huggingface")
-    monkeypatch.delenv("QDRANT_COLLECTION_PREFIX", raising=False)
-    monkeypatch.setenv("QDRANT_COLLECTION_NAME", "text-embedding-3-large")
+    monkeypatch.delenv("VECTOR_COLLECTION_PREFIX", raising=False)
+    monkeypatch.setenv("VECTOR_COLLECTION_PREFIX", "text-embedding-3-large")
 
     config = RAGConfig()
-    assert config.qdrant_collection_prefix == "text_embedding_3_large"
+    assert config.vector_collection_prefix == "text_embedding_3_large"
 
 
 def test_embedding_dimension_uses_override(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
     monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "1024")
+    monkeypatch.setenv("EMBEDDING_DIMENSION", "1024")
 
     config = RAGConfig()
     assert config.embedding_dimension == 1024
@@ -72,7 +72,7 @@ def test_embedding_dimension_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("EMBEDDING_MODEL", "text-embedding-3-small")
-    monkeypatch.delenv("EMBEDDING_DIMENSIONS", raising=False)
+    monkeypatch.delenv("EMBEDDING_DIMENSION", raising=False)
     config = RAGConfig()
     assert config.embedding_dimension == 1536
 
@@ -117,18 +117,18 @@ def test_shape_validator_rejects_google_dimension_override(monkeypatch: pytest.M
     apply_base_env(monkeypatch)
     monkeypatch.setenv("EMBEDDING_PROVIDER", "google")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "256")
+    monkeypatch.setenv("EMBEDDING_DIMENSION", "256")
 
-    with pytest.raises(ValueError, match="EMBEDDING_DIMENSIONS is not supported"):
+    with pytest.raises(ValueError, match="EMBEDDING_DIMENSION is not supported"):
         RAGConfig()
 
 
-def test_shape_validator_requires_ollama_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_shape_validator_requires_ollama_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
     monkeypatch.setenv("EMBEDDING_PROVIDER", "ollama")
-    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
 
-    with pytest.raises(ValueError, match="OLLAMA_URL is required"):
+    with pytest.raises(ValueError, match="OLLAMA_BASE_URL is required"):
         RAGConfig()
 
 
@@ -136,7 +136,6 @@ def test_shape_validator_requires_pinecone_api_key(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("VECTOR_STORE", "pinecone")
     monkeypatch.setenv("EMBEDDING_PROVIDER", "huggingface")
     monkeypatch.delenv("PINECONE_API_KEY", raising=False)
-    monkeypatch.delenv("VECTOR_STORE_API_KEY", raising=False)
 
     with pytest.raises(ValueError, match="PINECONE_API_KEY is required"):
         RAGConfig()
@@ -156,7 +155,6 @@ def test_shape_validator_requires_pgvector_dsn(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("VECTOR_STORE", "pgvector")
     monkeypatch.setenv("EMBEDDING_PROVIDER", "huggingface")
     monkeypatch.setenv("PGVECTOR_DSN", "")
-    monkeypatch.setenv("VECTOR_STORE_URL", "")
 
     with pytest.raises(ValueError, match="PGVECTOR_DSN is required"):
         RAGConfig()
@@ -180,10 +178,10 @@ def test_apply_dynamic_defaults_unknown_provider(monkeypatch: pytest.MonkeyPatch
 
 def test_apply_dynamic_defaults_empty_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "   ")
+    monkeypatch.setenv("EMBEDDING_DIMENSION", "   ")
     config = RAGConfig()
 
-    assert config.embedding_dimensions is None
+    assert config.embedding_dimension_override is None
 
 
 def test_apply_dynamic_defaults_empty_validation_query(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -201,15 +199,15 @@ def test_validate_non_empty_text() -> None:
 
 def test_validate_collection_prefix_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
-    monkeypatch.setenv("QDRANT_COLLECTION_PREFIX", " - . / ")
+    monkeypatch.setenv("VECTOR_COLLECTION_PREFIX", " - . / ")
 
-    with pytest.raises(ValueError, match="QDRANT_COLLECTION_PREFIX must not be empty."):
+    with pytest.raises(ValueError, match="VECTOR_COLLECTION_PREFIX must not be empty."):
         RAGConfig()
 
 
 def test_validate_collection_prefix_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
-    monkeypatch.setenv("QDRANT_COLLECTION_PREFIX", "valid_prefix")
+    monkeypatch.setenv("VECTOR_COLLECTION_PREFIX", "valid_prefix")
 
     from rag import config
 
@@ -219,17 +217,17 @@ def test_validate_collection_prefix_invalid(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(config, "_COLLECTION_PREFIX_RE", MockRegex())
     with pytest.raises(
-        ValueError, match="QDRANT_COLLECTION_PREFIX must contain only lowercase letters"
+        ValueError, match="VECTOR_COLLECTION_PREFIX must contain only lowercase letters"
     ):
         RAGConfig()
 
 
 def test_validate_collection_prefix_cleans(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
-    monkeypatch.setenv("QDRANT_COLLECTION_PREFIX", "A-b/C.d_e")
+    monkeypatch.setenv("VECTOR_COLLECTION_PREFIX", "A-b/C.d_e")
     config = RAGConfig()
 
-    assert config.qdrant_collection_prefix == "a_b_c_d_e"
+    assert config.vector_collection_prefix == "a_b_c_d_e"
 
 
 def test_apply_dynamic_defaults_not_dict() -> None:

@@ -2,7 +2,7 @@ import os
 import re
 from typing import Any, Literal, cast
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EmbeddingProviderName = Literal[
@@ -93,27 +93,18 @@ class RAGConfig(BaseSettings):
 
     qdrant_url: str | None = Field(None, validation_alias="QDRANT_URL")
     qdrant_api_key_rw: str | None = Field(None, validation_alias="QDRANT_API_KEY_RW")
-    qdrant_collection_prefix: str = Field(
-        "movies",
-        validation_alias=AliasChoices("QDRANT_COLLECTION_PREFIX", "QDRANT_COLLECTION_NAME"),
-    )
+    vector_collection_prefix: str = Field("movies", validation_alias="VECTOR_COLLECTION_PREFIX")
 
     vector_store: VectorStoreName = Field("qdrant", validation_alias="VECTOR_STORE")
-    vector_store_url: str | None = Field(None, validation_alias="VECTOR_STORE_URL")
-    vector_store_api_key: str | None = Field(None, validation_alias="VECTOR_STORE_API_KEY")
     chromadb_persist_path: str = Field(
         "outputs/chromadb/local", validation_alias="CHROMADB_PERSIST_PATH"
     )
-    pinecone_api_key: str | None = Field(
-        None, validation_alias=AliasChoices("PINECONE_API_KEY", "VECTOR_STORE_API_KEY")
-    )
+    pinecone_api_key: str | None = Field(None, validation_alias="PINECONE_API_KEY")
     pinecone_index_name: str = Field("movie-finder-rag", validation_alias="PINECONE_INDEX_NAME")
     pinecone_index_host: str | None = Field(None, validation_alias="PINECONE_INDEX_HOST")
     pinecone_cloud: str = Field("aws", validation_alias="PINECONE_CLOUD")
     pinecone_region: str = Field("us-east-1", validation_alias="PINECONE_REGION")
-    pgvector_dsn: str | None = Field(
-        None, validation_alias=AliasChoices("PGVECTOR_DSN", "VECTOR_STORE_URL")
-    )
+    pgvector_dsn: str | None = Field(None, validation_alias="PGVECTOR_DSN")
     pgvector_schema: str = Field("public", validation_alias="PGVECTOR_SCHEMA")
 
     embedding_provider: EmbeddingProviderName = Field(
@@ -122,10 +113,12 @@ class RAGConfig(BaseSettings):
     embedding_model: str = Field(
         DEFAULT_EMBEDDING_MODELS["openai"], validation_alias="EMBEDDING_MODEL"
     )
-    embedding_dimensions: int | None = Field(None, validation_alias="EMBEDDING_DIMENSIONS", ge=1)
+    embedding_dimension_override: int | None = Field(
+        None, validation_alias="EMBEDDING_DIMENSION", ge=1
+    )
     openai_api_key: str | None = Field(None, validation_alias="OPENAI_API_KEY")
     google_api_key: str | None = Field(None, validation_alias="GOOGLE_API_KEY")
-    ollama_url: str | None = Field(None, validation_alias="OLLAMA_URL")
+    ollama_base_url: str | None = Field(None, validation_alias="OLLAMA_BASE_URL")
     ollama_api_key: str | None = Field(None, validation_alias="OLLAMA_API_KEY")
     sentence_transformers_cache_dir: str | None = Field(
         None, validation_alias="SENTENCE_TRANSFORMERS_CACHE_DIR"
@@ -153,14 +146,16 @@ class RAGConfig(BaseSettings):
         if provider not in DEFAULT_EMBEDDING_MODELS:
             provider = "openai"
         model = normalized.get("EMBEDDING_MODEL") or normalized.get("embedding_model")
-        dimensions = normalized.get("EMBEDDING_DIMENSIONS", normalized.get("embedding_dimensions"))
+        dimensions = normalized.get(
+            "EMBEDDING_DIMENSION", normalized.get("embedding_dimension_override")
+        )
         validation_query = normalized.get("VALIDATION_QUERY", normalized.get("validation_query"))
 
         if not isinstance(model, str) or not model.strip():
             provider_name = cast(EmbeddingProviderName, provider)
             normalized["EMBEDDING_MODEL"] = DEFAULT_EMBEDDING_MODELS[provider_name]
         if isinstance(dimensions, str) and not dimensions.strip():
-            normalized["EMBEDDING_DIMENSIONS"] = None
+            normalized["EMBEDDING_DIMENSION"] = None
         if not isinstance(validation_query, str) or not validation_query.strip():
             normalized["VALIDATION_QUERY"] = DEFAULT_VALIDATION_QUERY
 
@@ -174,7 +169,7 @@ class RAGConfig(BaseSettings):
             raise ValueError("Value must not be empty.")
         return cleaned
 
-    @field_validator("qdrant_collection_prefix")
+    @field_validator("vector_collection_prefix")
     @classmethod
     def _validate_collection_prefix(cls, value: str) -> str:
         cleaned = value.strip().lower()
@@ -182,10 +177,10 @@ class RAGConfig(BaseSettings):
         cleaned = _INVALID_TOKEN_RE.sub("_", cleaned)
         cleaned = _MULTI_UNDERSCORE_RE.sub("_", cleaned).strip("_")
         if not cleaned:
-            raise ValueError("QDRANT_COLLECTION_PREFIX must not be empty.")
+            raise ValueError("VECTOR_COLLECTION_PREFIX must not be empty.")
         if not _COLLECTION_PREFIX_RE.fullmatch(cleaned):
             raise ValueError(
-                "QDRANT_COLLECTION_PREFIX must contain only lowercase letters, digits, and underscores."
+                "VECTOR_COLLECTION_PREFIX must contain only lowercase letters, digits, and underscores."
             )
         return cleaned
 
@@ -198,13 +193,11 @@ class RAGConfig(BaseSettings):
         if self.embedding_provider == "google" and not self.google_api_key:
             raise ValueError("GOOGLE_API_KEY is required when EMBEDDING_PROVIDER=google.")
 
-        if self.embedding_provider == "ollama" and not self.ollama_url:
-            raise ValueError("OLLAMA_URL is required when EMBEDDING_PROVIDER=ollama.")
+        if self.embedding_provider == "ollama" and not self.ollama_base_url:
+            raise ValueError("OLLAMA_BASE_URL is required when EMBEDDING_PROVIDER=ollama.")
 
-        if self.embedding_provider == "google" and self.embedding_dimensions is not None:
-            raise ValueError(
-                "EMBEDDING_DIMENSIONS is not supported when EMBEDDING_PROVIDER=google."
-            )
+        if self.embedding_provider == "google" and self.embedding_dimension_override is not None:
+            raise ValueError("EMBEDDING_DIMENSION is not supported when EMBEDDING_PROVIDER=google.")
 
         if self.vector_store == "qdrant":
             if not self.qdrant_url:
@@ -228,8 +221,8 @@ class RAGConfig(BaseSettings):
     @property
     def embedding_dimension(self) -> int:
         """Return the configured embedding model dimension when it is known."""
-        if self.embedding_dimensions is not None:
-            return self.embedding_dimensions
+        if self.embedding_dimension_override is not None:
+            return self.embedding_dimension_override
         return infer_embedding_dimension(self.embedding_provider, self.embedding_model)
 
 
