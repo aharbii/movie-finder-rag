@@ -324,12 +324,8 @@ def configureRuntimeEnv() {
         }
     }
 
-    if (env.VECTOR_STORE == 'qdrant') {
-        env.QDRANT_URL = env.QDRANT_URL
-        env.QDRANT_API_KEY_RW = env.QDRANT_API_KEY_RW
-    } else if (env.VECTOR_STORE == 'pinecone') {
+    if (env.VECTOR_STORE == 'pinecone') {
         env.PINECONE_INDEX_HOST = params.PINECONE_INDEX_HOST ?: env.PINECONE_INDEX_HOST
-        env.PINECONE_API_KEY = env.PINECONE_API_KEY
     } else if (env.VECTOR_STORE == 'pgvector') {
         env.PGVECTOR_DSN = params.PGVECTOR_DSN?.trim() ? params.PGVECTOR_DSN : env.PGVECTOR_DSN
     }

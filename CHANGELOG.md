@@ -77,6 +77,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   (`nomic-embed-text:latest`, `mxbai-embed-large:latest`, `all-minilm:latest`) matching the
   actual collection names ingested under ADR 0008.
 
+### Removed
+
+- `Makefile` — removed `migrate-legacy-qdrant-collection`; collection migration is no longer
+  needed under the ADR 0008 provider/vector naming contract.
+
 ### Fixed
 
 - `tui/app.py` — `_resolve_collection_name` now calls `infer_embedding_dimension` and
