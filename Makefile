@@ -21,7 +21,7 @@
 .PHONY: help init build setup clean clean-docker \
 	editor-up editor-down ci-down shell logs up down  run run-dev \
 	lint format fix typecheck test test-coverage pre-commit detect-secrets check \
-	backup cost-report qdrant-live-eval retrieve validate migrate-legacy-qdrant-collection tui
+	backup cost-report qdrant-live-eval retrieve validate tui
 
 
 .DEFAULT_GOAL := help
@@ -41,7 +41,6 @@ COVERAGE_HTML ?= reports/htmlcov
 JUNIT_XML ?= reports/junit.xml
 BACKUP_ARGS ?=
 QDRANT_EVAL_ARGS ?=
-MIGRATE_ARGS ?=
 
 # ---------------------------------------------------------------------------
 # exec when running, run --rm otherwise — avoids container startup overhead
@@ -104,7 +103,6 @@ help:
 	@echo "    retrieve       Runs the interactive CLI to validate retrieval logic"
 	@echo "    tui            Launches the full Textual TUI for retrieval evaluation"
 	@echo "    validate       Runs the post-ingest validation script"
-	@echo "    migrate-legacy-qdrant-collection  Backs up and migrates a legacy Qdrant collection into the ADR-style name"
 	@echo ""
 
 init:
@@ -210,6 +208,3 @@ tui:
 
 validate:
 	$(call exec_or_run,python scripts/validate_ingestion.py)
-
-migrate-legacy-qdrant-collection:
-	$(call exec_or_run,python scripts/migrate_legacy_qdrant_collection.py $(MIGRATE_ARGS))

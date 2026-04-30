@@ -16,20 +16,18 @@ This repo keeps the original operational split:
 | --- | --- |
 | `EMBEDDING_PROVIDER` | Selects the embedding provider |
 | `EMBEDDING_MODEL` | Selects the provider-specific embedding model |
-| `EMBEDDING_DIMENSIONS` | Optional output dimension override |
+| `EMBEDDING_DIMENSION` | Optional output dimension override |
 | `EMBEDDING_API_KEY` | Optional override for OpenAI, Google, or Ollama cloud |
 | `BACKUP_FORMAT` | Backup format archived by Jenkins, currently `chromadb` |
-| `OLLAMA_URL` | Docker-reachable Ollama URL when `EMBEDDING_PROVIDER=ollama` |
-| `COLLECTION_PREFIX` | Optional prefix override; default is `movies_<git sha8>` |
+| `OLLAMA_BASE_URL` | Docker-reachable Ollama URL when `EMBEDDING_PROVIDER=ollama` |
+| `VECTOR_COLLECTION_PREFIX` | Optional prefix override; default is `movies_<git sha8>` |
 | `VECTOR_STORE` | Selects the ingestion backend |
-| `VECTOR_STORE_URL` | Optional qdrant URL override |
-| `VECTOR_STORE_API_KEY` | Optional qdrant or pinecone API key override |
 | `CHROMADB_PERSIST_PATH` | Persistent path when `VECTOR_STORE=chromadb` |
 | `PINECONE_INDEX_NAME` | Pinecone index name |
 | `PINECONE_INDEX_HOST` | Optional Pinecone host override |
 | `PINECONE_CLOUD` | Pinecone serverless cloud |
 | `PINECONE_REGION` | Pinecone serverless region |
-| `PGVECTOR_DSN_OVERRIDE` | Optional pgvector DSN override |
+| `PGVECTOR_DSN` | Optional pgvector DSN override |
 | `PGVECTOR_SCHEMA` | Schema token for pgvector table derivation |
 | `WITH_PROVIDERS` | Docker build extra, typically `local` |
 | `VALIDATION_QUERY` | Smoke-test query for post-ingest validation |

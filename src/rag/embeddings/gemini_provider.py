@@ -22,8 +22,8 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
         if not settings.google_api_key:
             raise ValueError("GOOGLE_API_KEY is not defined in settings")
-        if settings.embedding_dimensions is not None:
-            raise ValueError("GOOGLE embeddings do not support EMBEDDING_DIMENSIONS in this repo.")
+        if settings.embedding_dimension_override is not None:
+            raise ValueError("GOOGLE embeddings do not support EMBEDDING_DIMENSION in this repo.")
 
         self.client = genai.Client(api_key=settings.google_api_key)
         self._usage = EmbeddingModelUsage()

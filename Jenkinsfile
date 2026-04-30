@@ -18,7 +18,7 @@
 //
 // ADR 0008 runtime contract:
 // - Embedding provider/model are selected via EMBEDDING_PROVIDER / EMBEDDING_MODEL.
-// - Final target name is derived from COLLECTION_PREFIX + sanitized model + dimension.
+// - Final target name is derived from VECTOR_COLLECTION_PREFIX + sanitized model + dimension.
 // - Backups are normalized into a portable ChromaDB artifact regardless of source backend.
 //
 // Required Jenkins Credential IDs (see docs/devops-setup.md):
@@ -70,7 +70,7 @@ pipeline {
             description: 'Embedding model identifier for the selected provider.'
         )
         string(
-            name: 'EMBEDDING_DIMENSIONS',
+            name: 'EMBEDDING_DIMENSION',
             defaultValue: '',
             description: 'Optional output dimension override for providers that support it.'
         )
@@ -80,7 +80,7 @@ pipeline {
             description: 'Optional API key override for OpenAI, Google, or Ollama cloud.'
         )
         string(
-            name: 'COLLECTION_PREFIX',
+            name: 'VECTOR_COLLECTION_PREFIX',
             defaultValue: '',
             description: 'Optional collection prefix override. Default is movies_<git sha8>.'
         )
@@ -90,17 +90,7 @@ pipeline {
             description: 'Vector store backend for ingestion and validation.'
         )
         string(
-            name: 'VECTOR_STORE_URL',
-            defaultValue: '',
-            description: 'Optional qdrant URL override for qdrant backups.'
-        )
-        password(
-            name: 'VECTOR_STORE_API_KEY',
-            defaultValue: '',
-            description: 'Optional qdrant or pinecone API key override.'
-        )
-        string(
-            name: 'OLLAMA_URL',
+            name: 'OLLAMA_BASE_URL',
             defaultValue: 'http://ollama:11434',
             description: 'Docker-reachable Ollama base URL when EMBEDDING_PROVIDER=ollama.'
         )
@@ -130,7 +120,7 @@ pipeline {
             description: 'Pinecone serverless region when an index must be created.'
         )
         password(
-            name: 'PGVECTOR_DSN_OVERRIDE',
+            name: 'PGVECTOR_DSN',
             defaultValue: '',
             description: 'Optional pgvector PostgreSQL DSN override.'
         )
@@ -310,10 +300,10 @@ def configureRuntimeEnv() {
     env.WITH_PROVIDERS = params.WITH_PROVIDERS ?: ''
     env.EMBEDDING_PROVIDER = params.EMBEDDING_PROVIDER ?: 'openai'
     env.EMBEDDING_MODEL = params.EMBEDDING_MODEL ?: 'text-embedding-3-large'
-    env.EMBEDDING_DIMENSIONS = params.EMBEDDING_DIMENSIONS ?: ''
-    env.OLLAMA_URL = params.OLLAMA_URL ?: env.OLLAMA_URL
+    env.EMBEDDING_DIMENSION = params.EMBEDDING_DIMENSION ?: ''
+    env.OLLAMA_BASE_URL = params.OLLAMA_BASE_URL ?: env.OLLAMA_BASE_URL
     def sha8 = env.GIT_COMMIT ? env.GIT_COMMIT.take(8) : "manual${env.BUILD_NUMBER}"
-    env.QDRANT_COLLECTION_PREFIX = params.COLLECTION_PREFIX?.trim() ? params.COLLECTION_PREFIX : "movies_${sha8}"
+    env.VECTOR_COLLECTION_PREFIX = params.VECTOR_COLLECTION_PREFIX?.trim() ? params.VECTOR_COLLECTION_PREFIX : "movies_${sha8}"
     env.VECTOR_STORE = params.VECTOR_STORE ?: 'qdrant'
     env.BACKUP_FORMAT = params.BACKUP_FORMAT ?: 'chromadb'
     env.VALIDATION_QUERY = params.VALIDATION_QUERY ?: 'A time-travel movie with a scientist and a DeLorean'
@@ -334,20 +324,9 @@ def configureRuntimeEnv() {
         }
     }
 
-    if (env.VECTOR_STORE == 'qdrant') {
-        env.VECTOR_STORE_URL = params.VECTOR_STORE_URL ?: env.QDRANT_URL
-        env.VECTOR_STORE_API_KEY = params.VECTOR_STORE_API_KEY?.trim() ? params.VECTOR_STORE_API_KEY : env.QDRANT_API_KEY_RW
-    } else if (env.VECTOR_STORE == 'pinecone') {
-        env.PINECONE_INDEX_HOST = params.PINECONE_INDEX_HOST ?: params.VECTOR_STORE_URL ?: env.PINECONE_INDEX_HOST
-        env.PINECONE_API_KEY = params.VECTOR_STORE_API_KEY?.trim() ? params.VECTOR_STORE_API_KEY : env.PINECONE_API_KEY
-        env.VECTOR_STORE_URL = env.PINECONE_INDEX_HOST
-        env.VECTOR_STORE_API_KEY = env.PINECONE_API_KEY
+    if (env.VECTOR_STORE == 'pinecone') {
+        env.PINECONE_INDEX_HOST = params.PINECONE_INDEX_HOST ?: env.PINECONE_INDEX_HOST
     } else if (env.VECTOR_STORE == 'pgvector') {
-        env.PGVECTOR_DSN = params.PGVECTOR_DSN_OVERRIDE?.trim() ? params.PGVECTOR_DSN_OVERRIDE : env.PGVECTOR_DSN
-        env.VECTOR_STORE_URL = env.PGVECTOR_DSN
-        env.VECTOR_STORE_API_KEY = ''
-    } else if (env.VECTOR_STORE == 'chromadb') {
-        env.VECTOR_STORE_URL = ''
-        env.VECTOR_STORE_API_KEY = ''
+        env.PGVECTOR_DSN = params.PGVECTOR_DSN?.trim() ? params.PGVECTOR_DSN : env.PGVECTOR_DSN
     }
 }

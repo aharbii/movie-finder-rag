@@ -100,7 +100,7 @@ def test_load_config_prefers_generic_target_name(
     monkeypatch.setattr(backup_script, "INGESTION_OUTPUTS_PATH", outputs_file)
     monkeypatch.delenv("BACKUP_COLLECTION_NAME", raising=False)
     monkeypatch.delenv("VECTOR_STORE_TARGET_NAME", raising=False)
-    monkeypatch.delenv("QDRANT_COLLECTION_NAME", raising=False)
+    monkeypatch.delenv("VECTOR_COLLECTION_PREFIX", raising=False)
     monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
     monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
     monkeypatch.delenv("EMBEDDING_DIMENSION", raising=False)

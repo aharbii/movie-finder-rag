@@ -47,7 +47,7 @@ def test_chromadb_uses_dynamic_target_name(
     model_metadata: EmbeddingModelMetadata,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings, "qdrant_collection_prefix", "movies")
+    monkeypatch.setattr(settings, "vector_collection_prefix", "movies")
     monkeypatch.setattr(settings, "chromadb_persist_path", "outputs/chromadb-test")
 
     with patch("chromadb.PersistentClient") as mock_client:
@@ -122,7 +122,7 @@ def test_qdrant_uses_dynamic_collection_name(
 ) -> None:
     monkeypatch.setattr(settings, "qdrant_url", "http://test")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "key")
-    monkeypatch.setattr(settings, "qdrant_collection_prefix", "movies")
+    monkeypatch.setattr(settings, "vector_collection_prefix", "movies")
 
     with patch("rag.vectorstore.qdrant_vectorstore.QdrantClient") as mock_client:
         mock_client.return_value.collection_exists.return_value = True

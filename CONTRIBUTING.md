@@ -41,7 +41,7 @@ committed VS Code tasks or launch configs from an attached container.
 # Qdrant Cloud (write-capable key)
 QDRANT_URL=https://your-cluster.qdrant.io
 QDRANT_API_KEY_RW=
-QDRANT_COLLECTION_NAME=movies
+VECTOR_COLLECTION_PREFIX=movies
 
 # OpenAI embeddings
 OPENAI_API_KEY=sk-...
@@ -102,7 +102,7 @@ make backup
 ```
 
 This target runs through Docker Compose, not the host Python environment. For the current Qdrant
-adapter, the existing `.env` values (`QDRANT_URL`, `QDRANT_API_KEY_RW`, `QDRANT_COLLECTION_NAME`)
+adapter, the existing `.env` values (`QDRANT_URL`, `QDRANT_API_KEY_RW`, `VECTOR_COLLECTION_PREFIX`)
 are enough.
 
 The backup utility is intentionally script-local and CI-friendly. It also accepts generic
@@ -117,8 +117,10 @@ Script-specific env fallbacks:
 | Variable                 | Purpose                            |
 | ------------------------ | ---------------------------------- |
 | `VECTOR_STORE`           | Backup source type                 |
-| `VECTOR_STORE_URL`       | Live vector store endpoint         |
-| `VECTOR_STORE_API_KEY`   | Live vector store API key          |
+| `QDRANT_URL`             | Qdrant endpoint when backing up Qdrant |
+| `QDRANT_API_KEY_RW`      | Qdrant write key when backing up Qdrant |
+| `PINECONE_INDEX_HOST`    | Pinecone host when backing up Pinecone |
+| `PINECONE_API_KEY`       | Pinecone API key when backing up Pinecone |
 | `BACKUP_COLLECTION_NAME` | Collection name to back up         |
 | `BACKUP_OUTPUT_ROOT`     | Output root for archived artifacts |
 | `BACKUP_BATCH_SIZE`      | Source pagination batch size       |

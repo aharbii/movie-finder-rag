@@ -22,7 +22,7 @@ class QdrantVectorStore(VectorStore):
         self.client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key_rw)
 
     def target_name(self, embedding_model: EmbeddingModelMetadata) -> str:
-        return resolve_collection_name(settings.qdrant_collection_prefix, embedding_model)
+        return resolve_collection_name(settings.vector_collection_prefix, embedding_model)
 
     def count(self, embedding_model: EmbeddingModelMetadata) -> int:
         collection_name = self.target_name(embedding_model)

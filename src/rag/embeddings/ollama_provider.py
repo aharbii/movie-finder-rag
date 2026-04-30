@@ -11,7 +11,7 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
     def __init__(self, model: str | None = None) -> None:
         self.logger = get_logger(self.__class__.__name__)
         self.model = model or settings.embedding_model
-        self.dimensions = settings.embedding_dimensions
+        self.dimensions = settings.embedding_dimension_override
         self._usage = EmbeddingModelUsage()
 
         try:
@@ -25,7 +25,7 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
         headers = None
         if settings.ollama_api_key:
             headers = {"Authorization": f"Bearer {settings.ollama_api_key}"}
-        self.client = Client(host=settings.ollama_url, headers=headers)
+        self.client = Client(host=settings.ollama_base_url, headers=headers)
 
     @property
     def model_info(self) -> EmbeddingModelMetadata:

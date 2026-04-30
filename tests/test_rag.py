@@ -8,7 +8,7 @@ from rag.vectorstore.qdrant_vectorstore import QdrantVectorStore
 def test_qdrant_vectorstore_uses_pydantic_settings(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "qdrant_url", "https://qdrant.example")
     monkeypatch.setattr(settings, "qdrant_api_key_rw", "rw-test-key")
-    monkeypatch.setattr(settings, "qdrant_collection_prefix", "movies")
+    monkeypatch.setattr(settings, "vector_collection_prefix", "movies")
 
     captured: dict[str, str] = {}
 

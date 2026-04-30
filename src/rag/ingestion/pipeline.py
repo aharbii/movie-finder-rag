@@ -136,7 +136,7 @@ def _write_ingestion_outputs(
                 f"EMBEDDING_DIMENSION={dimension}",
                 f"VECTOR_STORE={settings.vector_store}",
                 f"VECTOR_STORE_TARGET_NAME={target_name}",
-                f"QDRANT_COLLECTION_NAME={target_name}",
+                f"VECTOR_COLLECTION_PREFIX={target_name}",
                 f"INGESTION_PROMPT_TOKENS={prompt_tokens}",
                 f"INGESTION_TOTAL_TOKENS={total_tokens}",
                 f"INGESTION_ESTIMATED_COST_USD={estimated_cost_usd:.8f}",

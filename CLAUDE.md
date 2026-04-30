@@ -38,7 +38,7 @@ and upserts vectors into Qdrant Cloud. Runs as a one-shot script, not part of th
 ## Environment variables (`.env.example`)
 
 ```
-QDRANT_URL, QDRANT_API_KEY_RW, QDRANT_COLLECTION_NAME
+QDRANT_URL, QDRANT_API_KEY_RW, VECTOR_COLLECTION_PREFIX
 OPENAI_API_KEY
 KAGGLE_API_TOKEN
 ```

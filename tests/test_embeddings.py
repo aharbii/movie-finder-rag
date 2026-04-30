@@ -21,14 +21,14 @@ def test_google_provider_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_google_provider_rejects_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "google_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", 1024)
-    with pytest.raises(ValueError, match="GOOGLE embeddings do not support EMBEDDING_DIMENSIONS"):
+    monkeypatch.setattr(settings, "embedding_dimension_override", 1024)
+    with pytest.raises(ValueError, match="GOOGLE embeddings do not support EMBEDDING_DIMENSION"):
         GeminiEmbeddingProvider(model="text-embedding-004")
 
 
 def test_google_provider_model_info_known(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "google_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.gemini_provider.genai.Client"):
         provider = GeminiEmbeddingProvider(model="text-embedding-004")
         info = provider.model_info
@@ -37,7 +37,7 @@ def test_google_provider_model_info_known(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_google_provider_model_info_infer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "google_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with (
         patch("rag.embeddings.gemini_provider.genai.Client"),
         patch("rag.embeddings.gemini_provider.infer_embedding_dimension", return_value=128),
@@ -49,7 +49,7 @@ def test_google_provider_model_info_infer(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_google_provider_model_info_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "google_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with (
         patch("rag.embeddings.gemini_provider.genai.Client"),
         patch("rag.embeddings.gemini_provider.infer_embedding_dimension", return_value=0),
@@ -61,7 +61,7 @@ def test_google_provider_model_info_unknown(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_google_provider_embed_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "google_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.gemini_provider.genai.Client"):
         provider = GeminiEmbeddingProvider(model="text-embedding-004")
         mock_response = MagicMock()
@@ -78,7 +78,7 @@ def test_google_provider_embed_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_google_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "google_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.gemini_provider.genai.Client"):
         provider = GeminiEmbeddingProvider(model="text-embedding-004")
         mock_response = MagicMock()
@@ -89,7 +89,7 @@ def test_google_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_google_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "google_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.gemini_provider.genai.Client"):
         provider = GeminiEmbeddingProvider(model="text-embedding-004")
         cast(MagicMock, provider.client.models.embed_content).side_effect = Exception("API error")
@@ -98,7 +98,7 @@ def test_google_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # --- OllamaEmbeddingProvider Tests ---
 def test_ollama_provider_missing_import(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 384)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 384)
     with (
         patch.dict(sys.modules, {"ollama": None}),
         pytest.raises(RuntimeError, match="Ollama support requires"),
@@ -107,8 +107,8 @@ def test_ollama_provider_missing_import(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_ollama_provider_uses_host_and_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 384)
-    monkeypatch.setattr(settings, "ollama_url", "https://ollama.example")
+    monkeypatch.setattr(settings, "embedding_dimension_override", 384)
+    monkeypatch.setattr(settings, "ollama_base_url", "https://ollama.example")
     monkeypatch.setattr(settings, "ollama_api_key", "ollama-key")
     mock_client = MagicMock()
     mock_client.embed.return_value = {"embeddings": [[0.1, 0.2]], "prompt_eval_count": 5}
@@ -130,7 +130,7 @@ def test_ollama_provider_uses_host_and_dimensions(monkeypatch: pytest.MonkeyPatc
 
 
 def test_ollama_provider_model_info_from_probe(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     mock_client = MagicMock()
     mock_client.embed.return_value = {"embeddings": [[0.1, 0.2, 0.3]]}
     fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
@@ -143,7 +143,7 @@ def test_ollama_provider_model_info_from_probe(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_ollama_provider_model_info_probe_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     mock_client = MagicMock()
     mock_client.embed.side_effect = Exception("Probe failed")
     fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
@@ -157,7 +157,7 @@ def test_ollama_provider_model_info_probe_error(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_ollama_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 384)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 384)
     mock_client = MagicMock()
     mock_client.embed.return_value = {"embeddings": []}
     fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
@@ -167,7 +167,7 @@ def test_ollama_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_ollama_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 384)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 384)
     mock_client = MagicMock()
     mock_client.embed.side_effect = Exception("API Error")
     fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
@@ -178,7 +178,7 @@ def test_ollama_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # --- OpenAIEmbeddingProvider Tests ---
 def test_ollama_provider_model_info_skip_probe(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 1024)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 1024)
     fake_ollama = SimpleNamespace(Client=MagicMock())
     with patch.dict(sys.modules, {"ollama": fake_ollama}):
         provider = OllamaEmbeddingProvider(model="test-model")
@@ -186,7 +186,7 @@ def test_ollama_provider_model_info_skip_probe(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_ollama_provider_model_info_probe_empty_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     mock_client = MagicMock()
     mock_client.embed.return_value = {"embeddings": []}
     fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
@@ -200,7 +200,7 @@ def test_ollama_provider_model_info_probe_empty_embeddings(monkeypatch: pytest.M
 
 
 def test_ollama_provider_embed_batch_no_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     mock_client = MagicMock()
     mock_client.embed.return_value = {"embeddings": [[0.1]], "prompt_eval_count": 1}
     fake_ollama = SimpleNamespace(Client=MagicMock(return_value=mock_client))
@@ -215,7 +215,7 @@ def test_ollama_provider_embed_batch_no_dimensions(monkeypatch: pytest.MonkeyPat
 
 def test_openai_provider_passes_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test-key")
-    monkeypatch.setattr(settings, "embedding_dimensions", 1024)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 1024)
     mock_response = MagicMock()
     mock_response.data = [MagicMock(embedding=[0.1, 0.2])]
     mock_response.usage = MagicMock(prompt_tokens=10, total_tokens=10)
@@ -238,7 +238,7 @@ def test_openai_provider_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_openai_provider_model_info_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", 512)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 512)
     with patch("rag.embeddings.openai_provider.OpenAI"):
         provider = OpenAIEmbeddingProvider(model="text-embedding-3-small")
         assert provider.model_info.dimension == 512
@@ -246,7 +246,7 @@ def test_openai_provider_model_info_override(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_openai_provider_model_info_known_no_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.openai_provider.OpenAI"):
         provider = OpenAIEmbeddingProvider(model="text-embedding-3-small")
         assert provider.model_info.dimension == 1536
@@ -254,7 +254,7 @@ def test_openai_provider_model_info_known_no_override(monkeypatch: pytest.Monkey
 
 def test_openai_provider_model_info_infer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with (
         patch("rag.embeddings.openai_provider.OpenAI"),
         patch("rag.embeddings.openai_provider.infer_embedding_dimension", return_value=128),
@@ -265,7 +265,7 @@ def test_openai_provider_model_info_infer(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_openai_provider_model_info_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with (
         patch("rag.embeddings.openai_provider.OpenAI"),
         patch("rag.embeddings.openai_provider.infer_embedding_dimension", return_value=0),
@@ -277,7 +277,7 @@ def test_openai_provider_model_info_unknown(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_openai_provider_embed_no_dimensions(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.openai_provider.OpenAI") as mock_openai:
         mock_response = MagicMock()
         mock_response.data = [MagicMock(embedding=[0.1])]
@@ -295,7 +295,7 @@ def test_openai_provider_embed_no_dimensions(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_openai_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.openai_provider.OpenAI") as mock_openai:
         mock_response = MagicMock()
         mock_response.data = []
@@ -307,7 +307,7 @@ def test_openai_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_openai_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.openai_provider.OpenAI") as mock_openai:
         mock_openai.return_value.embeddings.create.side_effect = Exception("API error")
         provider = OpenAIEmbeddingProvider(model="text-embedding-ada-002")
@@ -316,7 +316,7 @@ def test_openai_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_openai_provider_update_usage_unknown_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "test")
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     with patch("rag.embeddings.openai_provider.OpenAI") as mock_openai:
         mock_response = MagicMock()
         mock_response.data = [MagicMock(embedding=[0.1])]
@@ -330,7 +330,7 @@ def test_openai_provider_update_usage_unknown_model(monkeypatch: pytest.MonkeyPa
 
 # --- SentenceTransformersEmbeddingProvider Tests ---
 def test_sentence_transformers_provider_missing_import(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 256)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 256)
     with (
         patch.dict(sys.modules, {"sentence_transformers": None}),
         pytest.raises(RuntimeError, match="Sentence-Transformers support requires"),
@@ -339,7 +339,7 @@ def test_sentence_transformers_provider_missing_import(monkeypatch: pytest.Monke
 
 
 def test_sentence_transformers_provider_uses_truncate_dim(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 256)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 256)
     mock_model = MagicMock()
     mock_model.get_sentence_embedding_dimension.return_value = 1024
     mock_model.encode.return_value.tolist.return_value = [[0.1, 0.2]]
@@ -358,7 +358,7 @@ def test_sentence_transformers_provider_uses_truncate_dim(monkeypatch: pytest.Mo
 
 
 def test_sentence_transformers_provider_model_info_infer(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     mock_model = MagicMock()
     mock_model.get_sentence_embedding_dimension.return_value = None
     fake_st = SimpleNamespace(SentenceTransformer=MagicMock(return_value=mock_model))
@@ -374,7 +374,7 @@ def test_sentence_transformers_provider_model_info_infer(monkeypatch: pytest.Mon
 
 
 def test_sentence_transformers_provider_model_info_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     mock_model = MagicMock()
     mock_model.get_sentence_embedding_dimension.return_value = 0
     fake_st = SimpleNamespace(SentenceTransformer=MagicMock(return_value=mock_model))
@@ -393,7 +393,7 @@ def test_sentence_transformers_provider_model_info_unknown(monkeypatch: pytest.M
 def test_sentence_transformers_provider_model_info_from_client(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", None)
+    monkeypatch.setattr(settings, "embedding_dimension_override", None)
     mock_model = MagicMock()
     mock_model.get_sentence_embedding_dimension.return_value = 768
     fake_st = SimpleNamespace(SentenceTransformer=MagicMock(return_value=mock_model))
@@ -403,7 +403,7 @@ def test_sentence_transformers_provider_model_info_from_client(
 
 
 def test_sentence_transformers_provider_embed_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 256)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 256)
     mock_model = MagicMock()
     mock_model.encode.return_value.tolist.return_value = []
     fake_st = SimpleNamespace(SentenceTransformer=MagicMock(return_value=mock_model))
@@ -413,7 +413,7 @@ def test_sentence_transformers_provider_embed_empty(monkeypatch: pytest.MonkeyPa
 
 
 def test_sentence_transformers_provider_embed_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "embedding_dimensions", 256)
+    monkeypatch.setattr(settings, "embedding_dimension_override", 256)
     mock_model = MagicMock()
     mock_model.encode.side_effect = Exception("encode error")
     fake_st = SimpleNamespace(SentenceTransformer=MagicMock(return_value=mock_model))

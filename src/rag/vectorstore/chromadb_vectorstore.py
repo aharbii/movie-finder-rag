@@ -17,7 +17,7 @@ class ChromaDBVectorStore(VectorStore):
         self.client = chromadb.PersistentClient(path=settings.chromadb_persist_path)
 
     def target_name(self, embedding_model: EmbeddingModelMetadata) -> str:
-        return resolve_collection_name(settings.qdrant_collection_prefix, embedding_model)
+        return resolve_collection_name(settings.vector_collection_prefix, embedding_model)
 
     def count(self, embedding_model: EmbeddingModelMetadata) -> int:
         collection = self.client.get_or_create_collection(name=self.target_name(embedding_model))
