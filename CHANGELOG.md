@@ -10,6 +10,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+**Chunking strategy experiment framework (issue #8 / parent #31)**
+
+- `src/rag/chunking/` — added the `Chunker` abstraction plus flat, fixed-size, sentence, and
+  field-based strategies. `CHUNKING_STRATEGY=flat` is the default and preserves the current
+  full-movie embedding behavior.
+- `src/rag/ingestion/pipeline.py` — ingestion now receives an explicit chunker dependency and
+  embeds generated chunks with chunk metadata in the stored payload.
+- `scripts/chunking_experiment.py` — local ChromaDB-only experiment harness that holds provider,
+  corpus, query set, and top-k fixed while varying chunking strategy; writes CSV and HTML reports
+  identifying the highest-MRR candidate before any production Qdrant deployment.
+- `Makefile` — added `chunking-experiment` target and ignored generated `experiments/` artifacts.
+- `CONTRIBUTING.md` — documented chunking settings, local experiment execution, and the >5% MRR
+  adoption gate for field-based chunking.
+
 **Textual TUI — retrieval evaluation app (issue #23)**
 
 - `tui/` — new top-level package containing the full Textual TUI for retrieval evaluation:

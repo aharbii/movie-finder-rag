@@ -10,11 +10,12 @@ Plots dataset from Kaggle, embeds each record with OpenAI/Gemini, and writes vec
 1. [Development setup](#development-setup)
 2. [Project structure](#project-structure)
 3. [Running the pipeline](#running-the-pipeline)
-4. [Adding an embedding provider](#adding-an-embedding-provider)
-5. [Adding a vector store backend](#adding-a-vector-store-backend)
-6. [Testing strategy](#testing-strategy)
-7. [CI/CD pipeline](#ci-cd-pipeline)
-8. [Sharing outputs with the chain team](#sharing-outputs-with-the-chain-team)
+4. [Chunking experiments](#chunking-experiments)
+5. [Adding an embedding provider](#adding-an-embedding-provider)
+6. [Adding a vector store backend](#adding-a-vector-store-backend)
+7. [Testing strategy](#testing-strategy)
+8. [CI/CD pipeline](#ci-cd-pipeline)
+9. [Sharing outputs with the chain team](#sharing-outputs-with-the-chain-team)
 
 ---
 
@@ -83,6 +84,23 @@ make ingest
 ```
 
 This runs the runtime image against external Qdrant Cloud using the values in `.env`.
+
+The ingestion pipeline always receives an explicit chunking strategy. The default
+`CHUNKING_STRATEGY=flat` preserves the current full-movie embedding behavior. Other strategy
+settings are available for experiments:
+
+```bash
+CHUNKING_STRATEGY=fixed_size
+CHUNK_SIZE=160
+CHUNK_OVERLAP=32
+
+CHUNKING_STRATEGY=sentence
+CHUNK_MIN_SENTENCES=1
+CHUNK_MAX_SENTENCES=4
+
+CHUNKING_STRATEGY=field
+CHUNK_FIELDS=plot,cast,metadata
+```
 
 ### Common quality commands
 
@@ -161,6 +179,30 @@ After ingestion, regenerate `outputs/reports/cost-report.json` from `ingestion-o
 ```bash
 make cost-report
 ```
+
+---
+
+## Chunking Experiments
+
+Issue #31 is a research spike, not an open-ended production migration. Run the sweep only after the
+baseline retrieval metrics are available, then compare candidate strategies against the flat
+baseline.
+
+```bash
+make chunking-experiment
+```
+
+Useful local spike options:
+
+```bash
+CHUNKING_EXPERIMENT_ARGS="--limit 1000 --top-k 5" make chunking-experiment
+```
+
+The script writes `experiments/chunking-results.csv` and caches embeddings under
+`outputs/cache/chunking-embeddings.json`, so repeated sweep entries do not re-embed the same text.
+Do not commit generated experiment results or cache files. Treat field-based improvements as
+adoptable only if MRR improves by more than 5% over flat; adopting field-based retrieval requires
+coordinating the query-time retrieval contract with `chain/`.
 
 ---
 

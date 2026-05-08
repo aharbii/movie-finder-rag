@@ -77,6 +77,48 @@ def test_embedding_dimension_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.embedding_dimension == 1536
 
 
+def test_chunking_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_base_env(monkeypatch)
+    config = RAGConfig()
+
+    assert config.chunking_strategy == "flat"
+    assert config.chunk_fields_list == ["plot", "cast", "metadata"]
+
+
+def test_chunk_fields_are_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_base_env(monkeypatch)
+    monkeypatch.setenv("CHUNK_FIELDS", " Plot, Cast ,, Metadata ")
+    config = RAGConfig()
+
+    assert config.chunk_fields == "plot,cast,metadata"
+
+
+def test_chunk_fields_rejects_empty_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_base_env(monkeypatch)
+    monkeypatch.setenv("CHUNK_FIELDS", " , ")
+
+    with pytest.raises(ValueError, match="CHUNK_FIELDS must include"):
+        RAGConfig()
+
+
+def test_chunk_overlap_must_be_smaller_than_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_base_env(monkeypatch)
+    monkeypatch.setenv("CHUNK_SIZE", "8")
+    monkeypatch.setenv("CHUNK_OVERLAP", "8")
+
+    with pytest.raises(ValueError, match="CHUNK_OVERLAP must be smaller"):
+        RAGConfig()
+
+
+def test_chunk_sentence_bounds_are_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_base_env(monkeypatch)
+    monkeypatch.setenv("CHUNK_MIN_SENTENCES", "4")
+    monkeypatch.setenv("CHUNK_MAX_SENTENCES", "3")
+
+    with pytest.raises(ValueError, match="CHUNK_MAX_SENTENCES must be"):
+        RAGConfig()
+
+
 def test_shape_validator_requires_provider_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_base_env(monkeypatch)
     monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")

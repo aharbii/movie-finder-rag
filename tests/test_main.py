@@ -6,6 +6,7 @@ from rag.main import main
 def test_main_uses_factories() -> None:
     with (
         patch("rag.main.dataset.download_data"),
+        patch("rag.main.get_chunker") as get_chunker,
         patch("rag.main.get_embedding_provider") as get_provider,
         patch("rag.main.get_vector_store") as get_store,
         patch("rag.main.pipeline.ingest_csv") as ingest_csv,
@@ -16,6 +17,9 @@ def test_main_uses_factories() -> None:
 
         main()
 
+        get_chunker.assert_called_once()
         get_provider.assert_called_once()
         get_store.assert_called_once()
-        ingest_csv.assert_called_once_with(provider, get_store.return_value)
+        ingest_csv.assert_called_once_with(
+            provider, get_store.return_value, get_chunker.return_value
+        )

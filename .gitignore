@@ -15,6 +15,7 @@ build/
 .coverage
 reports/
 outputs/
+experiments/
 
 # IDEs
 .vscode/*

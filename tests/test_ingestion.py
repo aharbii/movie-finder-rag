@@ -5,9 +5,21 @@ import pandas as pd
 import pytest
 
 import rag.ingestion.pipeline as pipeline_module
+from rag.chunking.base import Chunker, ChunkResult
+from rag.chunking.field import FieldChunker
+from rag.chunking.flat import FlatChunker
 from rag.ingestion.csv_loader import load_movies
 from rag.ingestion.pipeline import ingest_csv
 from rag.models.movie import Movie
+
+
+class EmptyChunker(Chunker):
+    @property
+    def strategy_name(self) -> str:
+        return "empty"
+
+    def chunk(self, movie: Movie) -> list[ChunkResult]:
+        return []
 
 
 def test_load_movies_success(tmp_path: Path) -> None:
@@ -87,9 +99,13 @@ def test_ingest_csv_success() -> None:
     )
 
     with patch("rag.ingestion.csv_loader.load_movies", return_value=[mock_movie]):
-        ingest_csv(mock_provider, mock_store)
+        ingest_csv(mock_provider, mock_store, FlatChunker())
 
     mock_provider.embed_batch.assert_called_once()
+    embedded_texts = mock_provider.embed_batch.call_args.args[0]
+    assert embedded_texts == [
+        "Title: Test Movie\nRelease Year: 2000\nDirector: D\nGenre: G\nCast: C\nPlot: Some plot"
+    ]
     mock_store.upsert_batch.assert_called_once()
 
 
@@ -100,9 +116,32 @@ def test_ingest_csv_no_movies() -> None:
     mock_store.target_name.return_value = "movies_test_model_3"
 
     with patch("rag.ingestion.csv_loader.load_movies", return_value=[]):
-        ingest_csv(mock_provider, mock_store)
+        ingest_csv(mock_provider, mock_store, FlatChunker())
 
     mock_provider.embed_batch.assert_not_called()
+
+
+def test_ingest_csv_no_chunks() -> None:
+    mock_provider = MagicMock()
+    mock_provider.model_info.name = "test-model"
+    mock_provider.model_info.dimension = 3
+    mock_store = MagicMock()
+    mock_store.target_name.return_value = "movies_test_model_3"
+    mock_movie = Movie(
+        id=1,
+        title="T",
+        release_year=2000,
+        director="D",
+        genre=["G"],
+        cast=["C"],
+        plot="P",
+    )
+
+    with patch("rag.ingestion.csv_loader.load_movies", return_value=[mock_movie]):
+        ingest_csv(mock_provider, mock_store, EmptyChunker())
+
+    mock_provider.embed_batch.assert_not_called()
+    mock_store.upsert_batch.assert_not_called()
 
 
 def test_ingest_csv_embedding_failure() -> None:
@@ -132,7 +171,7 @@ def test_ingest_csv_embedding_failure() -> None:
     )
 
     with patch("rag.ingestion.csv_loader.load_movies", return_value=[mock_movie]):
-        ingest_csv(mock_provider, mock_store)
+        ingest_csv(mock_provider, mock_store, FlatChunker())
 
     mock_store.upsert_batch.assert_not_called()
 
@@ -174,12 +213,20 @@ def test_ingest_csv_falls_back_to_per_movie_embedding() -> None:
     mock_store.target_name.return_value = "movies_test_model_3"
 
     with patch("rag.ingestion.csv_loader.load_movies", return_value=[movie_one, movie_two]):
-        ingest_csv(mock_provider, mock_store)
+        ingest_csv(mock_provider, mock_store, FlatChunker())
 
-    mock_provider.embed_batch.assert_called_once_with(["First plot", "Second plot"])
+    mock_provider.embed_batch.assert_called_once_with(
+        [
+            "Title: First\nRelease Year: 2000\nDirector: D1\nGenre: G1\nCast: C1\nPlot: First plot",
+            "Title: Second\nRelease Year: 2001\nDirector: D2\nGenre: G2\nCast: C2\nPlot: Second plot",
+        ]
+    )
     assert mock_provider.embed.call_count == 2
+    inserted_chunk = mock_store.upsert_batch.call_args.args[0][0]
+    assert inserted_chunk.source_movie_id == 1
+    assert inserted_chunk.chunk_strategy == "flat"
     mock_store.upsert_batch.assert_called_once_with(
-        [movie_one],
+        [inserted_chunk],
         [[0.1, 0.2, 0.3]],
         mock_provider.model_info,
     )
@@ -235,10 +282,53 @@ def test_ingest_csv_writes_skipped_movies_report(
     )
 
     with patch("rag.ingestion.csv_loader.load_movies", return_value=[movie_one, movie_two]):
-        ingest_csv(mock_provider, mock_store)
+        ingest_csv(mock_provider, mock_store, FlatChunker())
 
     report = (report_dir / "skipped-movies.json").read_text(encoding="utf-8")
-    assert '"skipped_movie_count": 1' in report
+    assert '"skipped_chunk_count": 1' in report
     assert '"id": 2' in report
     assert '"title": "Second"' in report
+    assert '"chunking_strategy": "flat"' in report
     assert '"reason": "embedding_failed_after_batch_fallback"' in report
+
+
+def test_ingest_csv_expands_field_chunks() -> None:
+    mock_provider = MagicMock()
+    mock_provider.model_info.name = "test-model"
+    mock_provider.model_info.dimension = 3
+    mock_provider.embed_batch.return_value = [
+        [0.1, 0.2, 0.3],
+        [0.4, 0.5, 0.6],
+    ]
+
+    mock_usage = MagicMock()
+    mock_usage.prompt_tokens = 10
+    mock_usage.total_tokens = 10
+    mock_usage.estimated_cost_usd = 0.0
+    mock_provider.get_model_usage.return_value = mock_usage
+
+    mock_store = MagicMock()
+    mock_store.target_name.return_value = "movies_test_model_3"
+
+    movie = Movie(
+        id=7,
+        title="Field Test",
+        release_year=2001,
+        director="Director",
+        genre=["Drama"],
+        cast=["Actor One", "Actor Two"],
+        plot="A plot",
+    )
+
+    with patch("rag.ingestion.csv_loader.load_movies", return_value=[movie]):
+        ingest_csv(mock_provider, mock_store, FieldChunker(["plot", "cast"]))
+
+    embedded_texts = mock_provider.embed_batch.call_args.args[0]
+    assert embedded_texts == [
+        "Title: Field Test\nPlot: A plot",
+        "Title: Field Test\nCast: Actor One, Actor Two",
+    ]
+    inserted_chunks = mock_store.upsert_batch.call_args.args[0]
+    assert [chunk.chunk_field for chunk in inserted_chunks] == ["plot", "cast"]
+    assert [chunk.source_movie_id for chunk in inserted_chunks] == [7, 7]
+    assert [chunk.id for chunk in inserted_chunks] == [7_000_000, 7_000_001]
