@@ -13,6 +13,7 @@ EmbeddingProviderName = Literal[
     "google",
 ]
 VectorStoreName = Literal["qdrant", "chromadb", "pinecone", "pgvector"]
+ChunkingStrategyName = Literal["flat", "fixed_size", "sentence", "field"]
 
 DEFAULT_EMBEDDING_MODELS: dict[EmbeddingProviderName, str] = {
     "openai": "text-embedding-3-large",
@@ -125,6 +126,12 @@ class RAGConfig(BaseSettings):
     )
 
     batch_size: int = Field(100, validation_alias="BATCH_SIZE", ge=1, le=10_000)
+    chunking_strategy: ChunkingStrategyName = Field("flat", validation_alias="CHUNKING_STRATEGY")
+    chunk_size: int = Field(160, validation_alias="CHUNK_SIZE", ge=1)
+    chunk_overlap: int = Field(32, validation_alias="CHUNK_OVERLAP", ge=0)
+    chunk_min_sentences: int = Field(1, validation_alias="CHUNK_MIN_SENTENCES", ge=1)
+    chunk_max_sentences: int = Field(4, validation_alias="CHUNK_MAX_SENTENCES", ge=1)
+    chunk_fields: str = Field("plot,cast,metadata", validation_alias="CHUNK_FIELDS")
     validation_query: str = Field(
         DEFAULT_VALIDATION_QUERY,
         validation_alias="VALIDATION_QUERY",
@@ -167,6 +174,14 @@ class RAGConfig(BaseSettings):
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("Value must not be empty.")
+        return cleaned
+
+    @field_validator("chunk_fields")
+    @classmethod
+    def _validate_chunk_fields(cls, value: str) -> str:
+        cleaned = ",".join(field.strip().lower() for field in value.split(",") if field.strip())
+        if not cleaned:
+            raise ValueError("CHUNK_FIELDS must include at least one field.")
         return cleaned
 
     @field_validator("vector_collection_prefix")
@@ -216,6 +231,14 @@ class RAGConfig(BaseSettings):
         if self.vector_store == "pgvector" and not self.pgvector_dsn:
             raise ValueError("PGVECTOR_DSN is required when VECTOR_STORE=pgvector.")
 
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError("CHUNK_OVERLAP must be smaller than CHUNK_SIZE.")
+
+        if self.chunk_max_sentences < self.chunk_min_sentences:
+            raise ValueError(
+                "CHUNK_MAX_SENTENCES must be greater than or equal to CHUNK_MIN_SENTENCES."
+            )
+
         return self
 
     @property
@@ -224,6 +247,11 @@ class RAGConfig(BaseSettings):
         if self.embedding_dimension_override is not None:
             return self.embedding_dimension_override
         return infer_embedding_dimension(self.embedding_provider, self.embedding_model)
+
+    @property
+    def chunk_fields_list(self) -> list[str]:
+        """Return field chunk names parsed from CHUNK_FIELDS."""
+        return [field.strip() for field in self.chunk_fields.split(",") if field.strip()]
 
 
 settings = RAGConfig()

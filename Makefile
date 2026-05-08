@@ -21,7 +21,7 @@
 .PHONY: help init build setup clean clean-docker \
 	editor-up editor-down ci-down shell logs up down  run run-dev \
 	lint format fix typecheck test test-coverage pre-commit detect-secrets check \
-	backup cost-report qdrant-live-eval retrieve validate tui
+	backup cost-report qdrant-live-eval chunking-experiment retrieve validate tui
 
 
 .DEFAULT_GOAL := help
@@ -41,6 +41,7 @@ COVERAGE_HTML ?= reports/htmlcov
 JUNIT_XML ?= reports/junit.xml
 BACKUP_ARGS ?=
 QDRANT_EVAL_ARGS ?=
+CHUNKING_EXPERIMENT_ARGS ?=
 
 # ---------------------------------------------------------------------------
 # exec when running, run --rm otherwise — avoids container startup overhead
@@ -100,6 +101,7 @@ help:
 	@echo "    backup         Runs the Docker-backed backup utility and writes artifacts under outputs/"
 	@echo "    cost-report    Refreshes outputs/reports/cost-report.json from ingestion outputs"
 	@echo "    qdrant-live-eval  Evaluates existing Qdrant collections and writes HTML/JSON reports"
+	@echo "    chunking-experiment  Runs chunking strategy sweep and writes experiments CSV"
 	@echo "    retrieve       Runs the interactive CLI to validate retrieval logic"
 	@echo "    tui            Launches the full Textual TUI for retrieval evaluation"
 	@echo "    validate       Runs the post-ingest validation script"
@@ -199,6 +201,9 @@ cost-report:
 
 qdrant-live-eval:
 	$(call exec_or_run,python scripts/evaluate_qdrant_collections.py $(QDRANT_EVAL_ARGS))
+
+chunking-experiment:
+	$(call exec_or_run,python scripts/chunking_experiment.py $(CHUNKING_EXPERIMENT_ARGS))
 
 retrieve:
 	$(call exec_or_run,python scripts/retrieve.py)
